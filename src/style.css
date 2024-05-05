@@ -1,0 +1,22 @@
+
+
+ul {
+    list-style: none;
+}
+
+li {
+    margin-bottom: 2em;
+}
+
+.header {
+    display: flex;
+    margin-bottom: 1em;
+}
+
+h2 {
+    margin: 0px
+}
+
+.warning {
+    background-color: red;
+}
