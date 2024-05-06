@@ -1,57 +1,73 @@
-import './style.css';
-import {effect, Source, $get, $set, Derived, untrack} from './lib/';
-import {$each, $if, $text} from "./helpers.ts";
-import {Component} from "./component.ts";
-import {button} from "./html-helpers.ts";
+import './style.css'
+import {
+    $effect,
+    $get,
+    $set,
+    Derived,
+    untrack,
+    $each,
+    $text,
+    $if,
+    NanoComponent,
+    $source,
+    type Source,
+} from './lib/'
+import { button } from './html-helpers.ts'
 
 class Car {
-    fuel = new Source(50);
+    fuel = $source(50)
     name: Source<string>
 
     constructor(name: string) {
-        this.name = new Source(name);
+        this.name = $source(name)
     }
 
     message = new Derived(() =>
-        $get(this.fuel) < 50 ? 'Time to refuel!' : 'Were good'
-    );
+        $get(this.fuel) < 50 ? 'Time to refuel!' : 'Were good',
+    )
 }
 
-
-const cars = new Source<Car[]>([new Car("Honda")])
+const cars = $source<Car[]>([new Car('Honda')])
 
 function addCar(name: string) {
-    const newCars = untrack(() =>
-        [...$get(cars)]
-    )
+    const newCars = untrack(() => [...$get(cars)])
 
     newCars.push(new Car(name))
     $set(cars, newCars)
 }
 
-function deleteCar(car : Car) {
-    $set(cars, untrack(() => [...$get(cars)]).filter(c => c !== car))
+function deleteCar(car: Car) {
+    $set(
+        cars,
+        untrack(() => [...$get(cars)]).filter((c) => c !== car),
+    )
 }
 
-const app = document.querySelector<HTMLDivElement>('#app')!;
+const app = document.querySelector<HTMLDivElement>('#app')!
 
-class FuelGage<T extends Element> extends Component<T> {
-    constructor(element: T, car : Car) {
+class FuelGage<T extends Element> extends NanoComponent<T> {
+    constructor(element: T, car: Car) {
         super(element, (node) => {
-            const div = document.createElement("div");
-            const span = document.createElement("span");
+            const div = document.createElement('div')
+            const span = document.createElement('span')
 
-            effect(() => $text(span, 'Fuel amount: ' + $get(car.fuel)))
+            $effect(() => $text(span, 'Fuel amount: ' + $get(car.fuel)))
             div.appendChild(span)
 
-            const btn1 = button("Refill", () => $set(car.fuel,100))
-            const btn2 = button("Drive 10mil", () => $set(car.fuel,$get(car.fuel) - 10))
+            const btn1 = button('Refill', () => $set(car.fuel, 100))
+            const btn2 = button('Drive 10mil', () =>
+                $set(car.fuel, $get(car.fuel) - 10),
+            )
             div.appendChild(btn1)
             div.appendChild(btn2)
 
-            $if(div, () => $get(car.fuel) < 30, (node) => {
-                new WarningPopup(node, car.fuel)
-            })
+            $if(
+                div,
+                () => $get(car.fuel) < 30,
+                (node) => {
+                    new WarningPopup(node, car.fuel)
+                },
+            )
 
             node.appendChild(div)
             return () => {
@@ -61,14 +77,14 @@ class FuelGage<T extends Element> extends Component<T> {
     }
 }
 
-class AddCar<T extends Element> extends Component<T> {
+class AddCar<T extends Element> extends NanoComponent<T> {
     constructor(element: T) {
         super(element, (node) => {
-            const form = document.createElement("form");
-            const input1 = document.createElement("input");
-            const submit = document.createElement("button");
+            const form = document.createElement('form')
+            const input1 = document.createElement('input')
+            const submit = document.createElement('button')
             submit.type = 'submit'
-            input1.placeholder = "Name of car"
+            input1.placeholder = 'Name of car'
             submit.innerText = 'Add a car'
             form.appendChild(input1)
             form.appendChild(submit)
@@ -84,45 +100,45 @@ class AddCar<T extends Element> extends Component<T> {
     }
 }
 
-new Component(app, (node) => {
-
-
+new NanoComponent(app, (node) => {
     new AddCar(node)
 
-    const list = document.createElement("ul")
+    const list = document.createElement('ul')
     node.appendChild(list)
     $each(list, cars, (car, _, node) => {
-        const li = document.createElement("li");
-        const btn = button("delete", () => deleteCar(car))
-        const div = document.createElement("div");
-        div.classList.add("header")
-        const heading = document.createElement("h2");
+        const li = document.createElement('li')
+        const btn = button('delete', () => deleteCar(car))
+        const div = document.createElement('div')
+        div.classList.add('header')
+        const heading = document.createElement('h2')
         div.appendChild(heading)
         div.appendChild(new Text('\u00A0'))
         div.appendChild(btn)
         li.appendChild(div)
         node.appendChild(li)
-        effect(() => $text(heading, $get(car.name)))
+        $effect(() => $text(heading, $get(car.name)))
         new FuelGage(li, car)
         return () => {
             node.removeChild(li)
         }
     })
+})
 
-});
-
-
-
-class WarningPopup<T extends Element> extends Component<T> {
-    constructor(element: T, public readonly fuelLevel: Source<number>) {
+class WarningPopup<T extends Element> extends NanoComponent<T> {
+    constructor(
+        element: T,
+        public readonly fuelLevel: Source<number>,
+    ) {
         super(element, (node) => {
-            const div = document.createElement('div');
-            div.classList.add('warning');
-            node.appendChild(div);
-            effect(() => $text(div, `Holy moly! ${$get(fuelLevel)} gallons left!`))
+            const div = document.createElement('div')
+            div.classList.add('warning')
+            node.appendChild(div)
+            $effect(() =>
+                $text(div, `Holy moly! ${$get(fuelLevel)} gallons left!`),
+            )
             return () => {
-                node.removeChild(div);
-            };
-        });
+                node.removeChild(div)
+            }
+        })
     }
 }

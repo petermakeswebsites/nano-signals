@@ -1,5 +1,11 @@
-import {Source} from "./source.ts";
-import {Derived} from "./derived.ts";
+import { Source } from './source.ts'
+import { Derived } from './derived.ts'
+
+export function _resetAllGlobalTrackers() {
+    effectContext = null
+    rootContext = null
+    untrackEnabled = false
+}
 
 /**
  * What "tracking" context - or effect - are we in?
@@ -7,27 +13,27 @@ import {Derived} from "./derived.ts";
  * {@link $get} phase that links the signal to the effect
  * calling it.
  */
-let effectContext: Effect<any> | null = null;
+let effectContext: Effect<any> | null = null
 
 /**
  * The root that owns the current effect. See {@link EffectRoot}
  */
-let root: EffectRoot | null = null;
+let rootContext: EffectRoot | null = null
 
 /**
  * Are we bypassing effects?
  */
-let untrackEnabled = false;
+let untrackEnabled = false
 
 /**
  *
  */
-type EffectCleanup<T> = ((destroy : boolean) => T) | void
+type EffectCleanup<T> = ((destroy: boolean) => T) | void
 
 /**
  *
  */
-type EffectFn<T> = (previous : T | undefined) => (EffectCleanup<T>)
+type EffectFn<T> = (previous: T | undefined) => EffectCleanup<T>
 
 /**
  * Creates a context that tracks when a getter is encountered
@@ -36,31 +42,29 @@ export class Effect<T> {
     /**
      * Cleanup function (return of effect)
      */
-        // @ts-expect-error it is assigned in the constructor
+    // @ts-expect-error it is assigned in the constructor
     cleanup: EffectCleanup<T>
 
     /**
      * Tracking the signals that will signal this effect
      */
-    deps = new Set<Source<any> | Derived<any>>();
+    deps = new Set<Source<any> | Derived<any>>()
 
     constructor(public readonly fn: EffectFn<T>) {
-        if (!root) {
-            throw new Error(`Attempting to create an effect outside of an effect root!`)
+        if (rootContext) {
+            rootContext.addEffect(this)
         }
 
-        root.addEffect(this)
-
         // Remember original tracking state
-        const originalUntrack = untrackEnabled;
+        const originalUntrack = untrackEnabled
         // Set current tracking state
-        untrackEnabled = false;
+        untrackEnabled = false
 
         // Set cleanup
         this.rerun()
 
         // Re-set to original tracking state
-        untrackEnabled = originalUntrack;
+        untrackEnabled = originalUntrack
     }
 
     /**
@@ -68,8 +72,8 @@ export class Effect<T> {
      */
     disconnectFromSources() {
         for (const dep of [...this.deps]) {
-            dep.rx.delete(this);
-            this.deps.delete(dep);
+            dep.rx.delete(this)
+            this.deps.delete(dep)
         }
     }
 
@@ -81,16 +85,16 @@ export class Effect<T> {
         const memory = this.cleanup ? this.cleanup(false) : undefined
 
         // Remove deps
-        this.disconnectFromSources();
+        this.disconnectFromSources()
 
         // Store original effect context and set this one to capture signals in the re-run
-        const originalEffectContext = effectContext;
-        effectContext = this;
+        const originalEffectContext = effectContext
+        effectContext = this
 
         this.cleanup = this.fn(memory as T | undefined)
 
         // Restore original effect context
-        effectContext = originalEffectContext;
+        effectContext = originalEffectContext
     }
 
     /**
@@ -99,11 +103,11 @@ export class Effect<T> {
      * to this
      */
     destroy() {
-        this.disconnectFromSources();
+        this.disconnectFromSources()
 
         // One last cleanup, without setting tracking
-        if (this.cleanup) this.cleanup(true);
-        this.cleanup = undefined;
+        if (this.cleanup) this.cleanup(true)
+        this.cleanup = undefined
     }
 }
 
@@ -115,6 +119,7 @@ export class Effect<T> {
  * preventing memory leaks.
  */
 export class EffectRoot {
+    destroyed = false
     rootDestroy: void | (() => void)
 
     /**
@@ -122,25 +127,25 @@ export class EffectRoot {
      * @param fn what to run inside the root - returns a cleanup function to run
      */
     constructor(fn: () => (() => void) | void) {
-        const oldRoot = root;
-        root = this;
-        this.rootDestroy = fn();
-        if (oldRoot) oldRoot.subroots.add(this);
-        root = oldRoot;
+        const oldRoot = rootContext
+        rootContext = this
+        this.rootDestroy = fn()
+        if (oldRoot) oldRoot.subroots.add(this)
+        rootContext = oldRoot
     }
 
     /**
      * Direct root children of this root
      */
-    subroots = new Set<EffectRoot>();
+    subroots = new Set<EffectRoot>()
 
     /**
      * Direct effect descendents of this root
      */
-    effects = new Set<Effect<any>>();
+    effects = new Set<Effect<any>>()
 
     addEffect(effect: Effect<any>) {
-        this.effects.add(effect);
+        this.effects.add(effect)
     }
 
     /**
@@ -149,24 +154,29 @@ export class EffectRoot {
      */
     destroy() {
         for (const effect of [...this.effects]) {
-            effect.destroy();
+            effect.destroy()
+            this.effects.delete(effect)
         }
         for (const subroot of [...this.subroots]) {
-            subroot.destroy();
-            this.subroots.delete(subroot);
+            subroot.destroy()
+            this.subroots.delete(subroot)
         }
         this.rootDestroy?.()
+        this.destroyed = true
     }
+}
+
+export function $root(fn: () => void | (() => void)) {
+    return new EffectRoot(fn)
 }
 
 /**
  * See {@link Effect}
  * @param fn
  */
-export function effect<T>(fn: EffectFn<T>) {
-    return new Effect(fn);
+export function $effect<T>(fn: EffectFn<T>) {
+    return new Effect(fn)
 }
-
 
 /**
  * Gets a value from a source. You can get the value (non-tracked) directly
@@ -176,10 +186,10 @@ export function effect<T>(fn: EffectFn<T>) {
  */
 export function $get<T>(source: Source<T> | Derived<T>): T {
     if (effectContext && !untrackEnabled && !source.rx.has(effectContext)) {
-        source.rx.add(effectContext);
-        effectContext.deps.add(source);
+        source.rx.add(effectContext)
+        effectContext.deps.add(source)
     }
-    return source.value;
+    return source.value
 }
 
 /**
@@ -188,19 +198,18 @@ export function $get<T>(source: Source<T> | Derived<T>): T {
  * @param newValue
  */
 export function $set<T>(source: Source<T>, newValue: T): void {
-    if (source instanceof Derived) throw new Error(`Can't set derived!`);
+    if (source instanceof Derived) throw new Error(`Can't set derived!`)
     const changed = newValue !== source.value
     if (changed) {
-        source.value = newValue;
+        source.value = newValue
 
         // The spread operator is necessary here because sets get weird
         // if modified while in use
         for (const effect of [...source.rx]) {
-            effect.rerun();
+            effect.rerun()
         }
     }
 }
-
 
 /**
  * Disables tracking for the current effect context, and returns
@@ -208,9 +217,9 @@ export function $set<T>(source: Source<T>, newValue: T): void {
  * @param fn
  */
 export function untrack<T>(fn: () => T): T {
-    const originalUntrack = untrackEnabled;
-    untrackEnabled = true;
-    const rtn = fn();
-    untrackEnabled = originalUntrack;
+    const originalUntrack = untrackEnabled
+    untrackEnabled = true
+    const rtn = fn()
+    untrackEnabled = originalUntrack
     return rtn
 }

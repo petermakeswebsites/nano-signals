@@ -1,11 +1,11 @@
-import {Source} from "./source";
-import {$set, Effect, EffectRoot} from "./effect";
+import { Source } from './source'
+import { $set, Effect, EffectRoot } from './effect.ts'
 
 /**
  * An effect and a source back-to-back, stores values
  */
 export class Derived<T> {
-    source: Source<T>;
+    source: Source<T>
     effect!: Effect<any>
 
     get value() {
@@ -27,8 +27,12 @@ export class Derived<T> {
         new EffectRoot(() => {
             this.effect = new Effect(() => {
                 const newVal = fn()
-                if (newVal !== this.source.value) $set(this.source, newVal);
-            });
-        });
+                if (newVal !== this.source.value) $set(this.source, newVal)
+            })
+        })
     }
+}
+
+export function $derived<T>(fn: () => T) {
+    return new Derived(fn)
 }

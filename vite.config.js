@@ -7,7 +7,7 @@ import dts from 'vite-plugin-dts'
 export default defineConfig({
     build: {
         minify: false,
-        target: 'modules',
+        target: 'esnext',
 
         lib: {
             // Could also be a dictionary or array of multiple entry points
@@ -15,10 +15,11 @@ export default defineConfig({
             name: 'NanoSignal',
             // the proper extensions will be added
             fileName: 'index',
-            formats: ["cjs", "es", "umd"]
+            formats: ["es"]
         },
     },
     plugins: [dts({
         include: "./src/lib/",
+        "exclude": ["./dist", "src/**/*.test.ts"]
     })]
 })
