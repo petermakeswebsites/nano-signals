@@ -2,7 +2,7 @@
 
 I made Nano Signals originally to explain in simpler terms how Svelte 5 works under the hood. But you might find this
 useful in some circumstances anyway as a tiny reactive framework when you want to stay really light but need a little
-bit of reactivity when you don't want to deploy an entire framework.
+bit of reactivity when you don't want to deploy an entire framework. Minified & GZIP it's less than **1.5kb**.
 
 Nano Signals is a lightweight TypeScript library designed for efficient and reactive state management. It enables
 fine-grained reactivity through sources, effects, and derived values, making it ideal for complex state management

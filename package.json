@@ -1,6 +1,10 @@
 {
   "name": "nano-signals",
-  "version": "0.0.1",
+  "author": "Peter Batory-Bernardin",
+  "license": "MIT",
+  "url": "https://github.com/petermakeswebsites/nano-signals",
+  "email": "peter@pmw.ltd",
+  "version": "0.0.2",
   "type": "module",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
