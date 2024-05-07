@@ -13,19 +13,18 @@ export class NanoComponent<T extends Element> {
     effectRoot: EffectRoot
     private _destroyed = false
 
+    attachTo: T
     /**
      *
      * @param attachTo
      * @param render Function that handles creation of effects, dom, etc in a synchronous root context. Returns a cleanup function
      */
-    constructor(
-        public readonly attachTo: T,
-        render: (node: T) => (() => void) | void,
-    ) {
+    constructor(attachTo: T, render: (node: T) => (() => void) | void) {
+        this.attachTo = attachTo
         this.effectRoot = new EffectRoot(() => {
             if (this._destroyed) throw new AlreadyDestroyed()
             // This should only run once!
-            return render(attachTo)
+            return render(this.attachTo)
         })
         this.onMount()
     }

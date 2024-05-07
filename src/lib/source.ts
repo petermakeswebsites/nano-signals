@@ -1,4 +1,5 @@
 import { Effect } from './effect.ts'
+import { Derived } from './derived.ts'
 
 /**
  * The simplest signal, it remembers who (which effect) got it,
@@ -11,7 +12,7 @@ export class Source<T> {
         this.value = def
     }
 
-    rx = new Set<Effect<any>>()
+    rx = new Set<Effect<any> | Derived<any>>()
 }
 
 export function $source<T>(def: T) {

@@ -6,13 +6,18 @@ import {
     Derived,
     untrack,
     $each,
-    $text,
+    $innertext,
     $if,
     NanoComponent,
     $source,
     type Source,
+    $create,
+    $child,
+    $children,
+    $class,
 } from './lib/'
 import { button } from './html-helpers.ts'
+import { $text } from './lib/helpers.ts'
 
 class Car {
     fuel = $source(50)
@@ -43,6 +48,29 @@ function deleteCar(car: Car) {
     )
 }
 
+class CarDisplay<T extends Element> extends NanoComponent<T> {
+    constructor(
+        element: T,
+        public readonly car: Car,
+    ) {
+        super(element, (node) => {
+            const div = $create('div')
+            const li = $create('li')
+            const heading = $create('h2')
+            $class(div, 'header')
+            const btn = $create('button', undefined, {
+                click: () => deleteCar(car),
+            })
+            btn.innerText = 'delete'
+            $children(div, heading, $text('\u00A0'), btn)
+            $child(li, div)
+            $effect(() => $innertext(heading, $get(car.name)))
+            new FuelGage(li, car)
+            return $child(node, li)
+        })
+    }
+}
+
 const app = document.querySelector<HTMLDivElement>('#app')!
 
 class FuelGage<T extends Element> extends NanoComponent<T> {
@@ -51,13 +79,14 @@ class FuelGage<T extends Element> extends NanoComponent<T> {
             const div = document.createElement('div')
             const span = document.createElement('span')
 
-            $effect(() => $text(span, 'Fuel amount: ' + $get(car.fuel)))
+            $effect(() => $innertext(span, 'Fuel amount: ' + $get(car.fuel)))
             div.appendChild(span)
 
             const btn1 = button('Refill', () => $set(car.fuel, 100))
             const btn2 = button('Drive 10mil', () =>
                 $set(car.fuel, $get(car.fuel) - 10),
             )
+            div.appendChild($create('br'))
             div.appendChild(btn1)
             div.appendChild(btn2)
 
@@ -65,7 +94,13 @@ class FuelGage<T extends Element> extends NanoComponent<T> {
                 div,
                 () => $get(car.fuel) < 30,
                 (node) => {
-                    new WarningPopup(node, car.fuel)
+                    const popup = new WarningPopup(node, car.fuel)
+                    return () => popup.destroy()
+                },
+                (node) => {
+                    const text = document.createTextNode('yeah its good enough')
+                    node.appendChild(text)
+                    return () => node.removeChild(text)
                 },
             )
 
@@ -80,22 +115,22 @@ class FuelGage<T extends Element> extends NanoComponent<T> {
 class AddCar<T extends Element> extends NanoComponent<T> {
     constructor(element: T) {
         super(element, (node) => {
-            const form = document.createElement('form')
-            const input1 = document.createElement('input')
-            const submit = document.createElement('button')
-            submit.type = 'submit'
-            input1.placeholder = 'Name of car'
-            submit.innerText = 'Add a car'
-            form.appendChild(input1)
-            form.appendChild(submit)
-            node.appendChild(form)
-            form.onsubmit = (e) => {
-                e.preventDefault()
-                addCar(input1.value)
-            }
-            return () => {
-                node.removeChild(form)
-            }
+            const svg = $create('svg', {
+                viewBox: '0 0 100 100',
+                width: '100',
+                height: '100',
+            })
+            const input1 = $create('input', { placeholder: 'Name of car' })
+            const submit = $create('button', { type: 'submit' })
+            const form = $create('form', undefined, {
+                submit: (e) => {
+                    e.preventDefault()
+                    addCar(input1.value)
+                },
+            })
+            $innertext(submit, 'Add a car')
+            $children(form, input1, submit)
+            return $children(node, svg, form)
         })
     }
 }
@@ -103,24 +138,18 @@ class AddCar<T extends Element> extends NanoComponent<T> {
 new NanoComponent(app, (node) => {
     new AddCar(node)
 
-    const list = document.createElement('ul')
-    node.appendChild(list)
+    const h1 = $create('h1')
+    $effect(() => {
+        h1.innerText = $get(cars).length.toString()
+    })
+
+    $child(node, $create('hr'))
+    const list = $create('ul')
+    $child(node, list)
+
     $each(list, cars, (car, _, node) => {
-        const li = document.createElement('li')
-        const btn = button('delete', () => deleteCar(car))
-        const div = document.createElement('div')
-        div.classList.add('header')
-        const heading = document.createElement('h2')
-        div.appendChild(heading)
-        div.appendChild(new Text('\u00A0'))
-        div.appendChild(btn)
-        li.appendChild(div)
-        node.appendChild(li)
-        $effect(() => $text(heading, $get(car.name)))
-        new FuelGage(li, car)
-        return () => {
-            node.removeChild(li)
-        }
+        const carDisplay = new CarDisplay(node, car)
+        return () => carDisplay.destroy()
     })
 })
 
@@ -130,15 +159,12 @@ class WarningPopup<T extends Element> extends NanoComponent<T> {
         public readonly fuelLevel: Source<number>,
     ) {
         super(element, (node) => {
-            const div = document.createElement('div')
-            div.classList.add('warning')
-            node.appendChild(div)
+            const div = $create('div')
+            $class(div, 'warning')
             $effect(() =>
-                $text(div, `Holy moly! ${$get(fuelLevel)} gallons left!`),
+                $innertext(div, `Holy moly! ${$get(fuelLevel)} gallons left!`),
             )
-            return () => {
-                node.removeChild(div)
-            }
+            return $child(node, div)
         })
     }
 }

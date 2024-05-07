@@ -1,35 +1,30 @@
 import { Source } from './source'
-import { $set, Effect, EffectRoot } from './effect.ts'
+import { type Effect } from './effect.ts'
+import { Flag } from './batch.ts'
+import { collect_deps } from './collector.ts'
 
 /**
  * An effect and a source back-to-back, stores values
  */
 export class Derived<T> {
-    source: Source<T>
-    effect!: Effect<any>
-
+    rx = new Set<Effect<any> | Derived<any>>()
+    deps = new Set<Derived<any> | Source<any>>()
+    flag = Flag.DIRTY
+    _value: T
     get value() {
-        return this.source.value
-    }
-
-    get rx() {
-        return this.source.rx
+        if (this.flag === Flag.DIRTY) {
+            this._value = collect_deps(this.fn, this)
+            Flag.CLEAN
+        }
+        return this._value
     }
 
     constructor(public readonly fn: () => T) {
-        // @ts-expect-error we are definitely setting the correct source in the function below
-        // no point in letting the function run twice for typescript's sake
-        this.source = new Source()
-
         // We basically set up a private root with a private effect.
         // This root might have no owner, or it might be owned by another root
         // Not exactly sure if this reflects Svelte's implementation
-        new EffectRoot(() => {
-            this.effect = new Effect(() => {
-                const newVal = fn()
-                if (newVal !== this.source.value) $set(this.source, newVal)
-            })
-        })
+        this._value = collect_deps(fn, this)
+        this.flag = Flag.CLEAN
     }
 }
 
