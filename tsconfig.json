@@ -4,7 +4,12 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "declaration": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable",
+      "es2021.weakref"
+    ],
     "skipLibCheck": true,
 
     /* Bundler mode */

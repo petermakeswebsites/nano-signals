@@ -1,5 +1,6 @@
-import { Effect } from './effect.ts'
+import { $set, Effect } from './effect.ts'
 import { Derived } from './derived.ts'
+import { Inspector } from './inspect.ts'
 
 /**
  * The simplest signal, it remembers who (which effect) got it,
@@ -8,13 +9,20 @@ import { Derived } from './derived.ts'
 export class Source<T> {
     value: T
 
-    constructor(def: T) {
+    weakref = new WeakRef<Source<T>>(this)
+
+    constructor(def: T, name?: string) {
+        if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
         this.value = def
+    }
+
+    set(val: T) {
+        $set(this, val)
     }
 
     rx = new Set<Effect<any> | Derived<any>>()
 }
 
-export function $source<T>(def: T) {
-    return new Source(def)
+export function $source<T>(def: T, name?: string) {
+    return new Source(def, name)
 }

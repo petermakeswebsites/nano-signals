@@ -11,6 +11,15 @@ export {
     $create,
     $child,
     $children,
+    $destroyer,
 } from './helpers.ts'
 export { Batch, $batch } from './batch.ts'
 export { untrack } from './collector.ts'
+export {
+    Inspector,
+    type Allowed,
+    type AllowedEmitter,
+    type AllowedReceiver,
+    type RefdItem,
+    type DataPack,
+} from './inspect.ts'

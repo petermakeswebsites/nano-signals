@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 ul {
     list-style: none;
 }
@@ -17,4 +21,18 @@ h2 {
 
 .warning {
     background-color: red;
+}
+
+button.hidden {
+    display: none;
+}
+
+#stepping {
+    position: fixed;
+    right: 1em;
+    top: 1em;
+}
+
+button {
+    
 }

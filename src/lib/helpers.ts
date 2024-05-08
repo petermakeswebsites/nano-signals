@@ -1,6 +1,7 @@
 import { Derived } from './derived.ts'
-import { $get, Effect, EffectRoot } from './effect.ts'
+import { $get, Effect } from './effect.ts'
 import { Source } from './source.ts'
+import { NanoComponent } from './component.ts'
 
 /**
  * @param node
@@ -28,15 +29,16 @@ export function $if(
     fn: () => boolean,
     render: (node: Element) => void | (() => void),
     or: undefined | ((node: Element) => void | (() => void)),
+    name?: string,
 ) {
-    const isTrue = new Derived(fn)
+    const isTrue = new Derived(fn, 'if' + (name ? ' ' + name : ''))
     new Effect(() => {
         if ($get(isTrue)) {
             return render(node)
         } else {
             if (or) return or(node)
         }
-    })
+    }, 'then render')
 }
 
 // export function $event<
@@ -84,47 +86,14 @@ export function $children<T extends Element, Q extends (Element | Text)[]>(
 
 export function $create<T extends keyof HTMLElementTagNameMap>(
     tagName: T,
-    attributes?: { [index: string]: any },
-    events?: {
-        [K in keyof HTMLElementEventMap]?: (
-            this: HTMLElementTagNameMap[T],
-            ev: HTMLElementEventMap[K],
-        ) => any
-    },
 ): HTMLElementTagNameMap[T]
 export function $create<T extends keyof SVGElementTagNameMap>(
     tagName: T,
-    attributes?: { [index: string]: any },
-    events?: {
-        [K in keyof SVGElementEventMap]?: (
-            this: SVGElementTagNameMap[T],
-            ev: SVGElementEventMap[K],
-        ) => any
-    },
 ): SVGElementTagNameMap[T]
 export function $create<
     T extends keyof (HTMLElementTagNameMap | SVGElementTagNameMap),
->(
-    tagName: T,
-    attributes: { [index: string]: any } = {},
-    events: { [key: string]: Function } = {},
-): HTMLElement | SVGElement {
+>(tagName: T): HTMLElement | SVGElement {
     const element = document.createElement(tagName)
-    new Effect(() => {
-        const root = new EffectRoot(() => {
-            if (attributes)
-                Object.entries(attributes).forEach(([key, value]) => {
-                    element.setAttribute(key, value)
-                })
-            if (events)
-                Object.entries(events).forEach(([key, value]) => {
-                    element.addEventListener(key, value as any)
-                })
-        })
-        return () => {
-            root.destroy()
-        }
-    })
     return element
 }
 
@@ -135,19 +104,32 @@ export function $each<T, U extends Element, Q = number>(
     node: U,
     arr: Source<T[]>,
     fn: (item: T, index: number, node: U) => void | (() => void),
-    id: (item: T, index: number) => Q = (_, index) => index as Q,
+    id?: (item: T, index: number) => Q,
+    name?: string,
 ) {
-    new Effect(() => {
-        const roots = new Map(
-            $get(arr).map((item, index) => {
-                return [id(item, index), fn(item, index, node)] as const
-            }),
-        )
+    if (id === undefined)
+        (id = (_, index) => index as Q),
+            new Effect(
+                () => {
+                    const roots = new Map(
+                        $get(arr).map((item, index) => {
+                            return [
+                                id!(item, index),
+                                fn(item, index, node),
+                            ] as const
+                        }),
+                    )
 
-        return () => {
-            for (const [_, destroyFn] of [...roots]) {
-                destroyFn?.()
-            }
-        }
-    })
+                    return () => {
+                        for (const [_, destroyFn] of [...roots]) {
+                            destroyFn?.()
+                        }
+                    }
+                },
+                'each ' + (name ? ' ' + name : ''),
+            )
+}
+
+export function $destroyer(comp: NanoComponent<any>) {
+    return () => comp.destroy()
 }

@@ -2,6 +2,7 @@ import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { Batch, mark_dirty_recursive } from './batch.ts'
 import { collect_deps, DepCollector, disconnect_deps } from './collector.ts'
+import { Inspector } from './inspect.ts'
 
 export function _resetAllGlobalTrackers() {
     rootContext = null
@@ -26,6 +27,7 @@ export type EffectFn<T> = (previous: T | undefined) => EffectCleanup<T>
  * Creates a context that tracks when a getter is encountered
  */
 export class Effect<T> {
+    destroyed = false
     /**
      * Cleanup function (return of effect)
      */
@@ -37,7 +39,16 @@ export class Effect<T> {
      */
     deps = new Set<Source<any> | Derived<any>>()
 
-    constructor(public readonly fn: EffectFn<T>) {
+    weakref = new WeakRef(this)
+
+    constructor(
+        public readonly fn: EffectFn<T>,
+        name?: string,
+    ) {
+        if (Inspector.inspecting) {
+            if (!name) console.trace('Effect created without name!', this)
+            Inspector._newItem(this.weakref, name)
+        }
         if (!rootContext!) throw new Error(`Cannot create effect without root`)
         rootContext.addEffect(this)
         // Set cleanup
@@ -49,6 +60,10 @@ export class Effect<T> {
      * and refresh signals (because they might change!)
      */
     rerun() {
+        if (this.destroyed)
+            throw new Error(
+                `Effect was destroyed, should not have been re-run!`,
+            )
         const memory = this.cleanup ? this.cleanup(false) : undefined
 
         // Remove deps
@@ -67,10 +82,13 @@ export class Effect<T> {
      */
     destroy() {
         disconnect_deps(this)
+        this.destroyed = true
 
         // One last cleanup, without setting tracking
         if (this.cleanup) this.cleanup(true)
+
         this.cleanup = undefined
+        if (Inspector.inspecting) Inspector._destroyItem(this.weakref)
     }
 }
 
@@ -89,7 +107,10 @@ export class EffectRoot {
      * Create an effect context
      * @param fn what to run inside the root - returns a cleanup function to run
      */
-    constructor(fn: () => (() => void) | void) {
+    constructor(
+        fn: () => (() => void) | void,
+        public readonly name?: string,
+    ) {
         const oldRoot = rootContext
         rootContext = this
         this.rootDestroy = fn()
@@ -119,16 +140,16 @@ export class EffectRoot {
     }
 }
 
-export function $root(fn: () => void | (() => void)) {
-    return new EffectRoot(fn)
+export function $root(fn: () => void | (() => void), name?: string) {
+    return new EffectRoot(fn, name)
 }
 
 /**
  * See {@link Effect}
  * @param fn
  */
-export function $effect<T>(fn: EffectFn<T>) {
-    return new Effect(fn)
+export function $effect<T>(fn: EffectFn<T>, name?: string) {
+    return new Effect(fn, name)
 }
 
 /**

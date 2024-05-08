@@ -1,5 +1,6 @@
 import { Effect } from './effect.ts'
 import { Derived } from './derived.ts'
+import { Inspector } from './inspect.ts'
 
 /**
  * Batch creates a context where signals and deriveds and effects can be postponed
@@ -19,6 +20,9 @@ export class Batch<T> {
     queue: Set<Effect<any>> = new Set()
     add(effect: Effect<any>) {
         this.queue.add(effect)
+        if (Inspector.inspecting) {
+            Inspector._registerPendingEffect(effect.weakref)
+        }
     }
     readonly final: T
     constructor(fn: (batch: Batch<T>) => T) {
@@ -33,11 +37,22 @@ export class Batch<T> {
     }
 
     runAll() {
-        new Batch(() => {
-            for (const effect of this.queue) {
-                effect.rerun()
-            }
-        })
+        const next = () => {
+            new Batch(() => {
+                for (const effect of this.queue) {
+                    if (!effect.destroyed) {
+                        if (Inspector.inspecting)
+                            Inspector._removePendingEffect(effect.weakref)
+                        effect.rerun()
+                    }
+                }
+            })
+        }
+        if (Inspector.inspecting && Inspector.stepping) {
+            Inspector._setNextStep(next)
+        } else {
+            next()
+        }
     }
 }
 
@@ -57,10 +72,12 @@ export enum Flag {
  * @param source
  */
 export function mark_dirty_recursive(source: Effect<any> | Derived<any>) {
+    // Deriveds should go first, they're higher priority
     if (source instanceof Derived) {
         source.flag = Flag.DIRTY
-        source.rx.forEach((effect) => {
-            mark_dirty_recursive(effect)
+        Inspector._registerMarkDirty(source.weakref)
+        source.rx.forEach((effectOrDerived) => {
+            mark_dirty_recursive(effectOrDerived)
         })
     } else {
         Batch.currentBatch!.add(source)

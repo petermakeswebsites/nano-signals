@@ -19,13 +19,17 @@ export class NanoComponent<T extends Element> {
      * @param attachTo
      * @param render Function that handles creation of effects, dom, etc in a synchronous root context. Returns a cleanup function
      */
-    constructor(attachTo: T, render: (node: T) => (() => void) | void) {
+    constructor(
+        attachTo: T,
+        render: (node: T) => (() => void) | void,
+        name?: string,
+    ) {
         this.attachTo = attachTo
         this.effectRoot = new EffectRoot(() => {
             if (this._destroyed) throw new AlreadyDestroyed()
             // This should only run once!
             return render(this.attachTo)
-        })
+        }, name)
         this.onMount()
     }
 
@@ -44,6 +48,7 @@ export class NanoComponent<T extends Element> {
 export function $component<T extends Element>(
     attachTo: T,
     render: (node: T) => (() => void) | void,
+    name?: string,
 ) {
-    return new NanoComponent(attachTo, render)
+    return new NanoComponent(attachTo, render, name)
 }
