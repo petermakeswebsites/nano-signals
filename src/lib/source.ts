@@ -12,7 +12,10 @@ export class Source<T> {
     weakref = new WeakRef<Source<T>>(this)
 
     constructor(def: T, name?: string) {
-        if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
+        if (Inspector.inspecting) {
+            Inspector._newItem(this.weakref, name)
+            Inspector._updateValue(this.weakref, def)
+        }
         this.value = def
     }
 

@@ -4,11 +4,8 @@ import { cytoStyle } from './styles.ts'
 import { VisualiserList } from './idlog.ts'
 import { edgeID, toData, toEdge } from './todata.ts'
 
-// @ts-ignore
-import coseBilkent from 'cytoscape-cose-bilkent'
 import { DebounceTimer } from '../helpers/debounce.ts'
 import { cytoLayout } from './layout.ts'
-cytoscape.use(coseBilkent)
 
 export class Visualiser {
     cy = cytoscape({ style: cytoStyle })
@@ -19,47 +16,37 @@ export class Visualiser {
         return { id, ...obj }
     }
 
+    #valueId(id: string) {
+        return id + '_value'
+    }
+
     constructor(inspector: typeof Inspector) {
         inspector.inspecting = true
-        inspector.oncreatenode = ({ name, ref }) => {
+
+        inspector.onCreateNode = ({ name, ref }) => {
             const id = VisualiserList.create(ref)
             const data = toData({ name, ref, id })
             this.cy.add({
                 group: 'nodes',
-                ...data,
+                data: {
+                    id: this.#valueId(id),
+                    ref: data.ref,
+                    type: 'value',
+                    value: '',
+                    name: '',
+                },
+                grabbable: false,
+                selectable: false,
+            })
+            this.cy.add({
+                group: 'nodes',
+                data: { ...data, parent: this.#valueId(id) },
             })
             this._updated()
         }
 
-        inspector.ondestroynode = ({ ref }) => {
-            const id = VisualiserList.getID(ref)
-            this.cy.getElementById(id).data('livestatus', 'destroyed')
-            this._updated()
-        }
-
-        inspector.ongarbagecollectnode = ({ ref }) => {
-            const id = VisualiserList.getID(ref)
-            VisualiserList.remove(ref)
-            this.cy.getElementById(id).remove()
-            this._updated()
-        }
-
-        inspector.onupdatenode = ({ name, ref }) => {
-            const id = VisualiserList.getID(ref)
-            const d = toData({ name, ref, id }).data
-            this.cy.getElementById(id).data(d)
-            // this._updated()
-        }
-
-        inspector.oncreatedep = undefined
-        inspector.ondestroydep = undefined
-
-        inspector.oncreaterx = (source, target) => {
-            const edge = toEdge(
-                this.#withID(source),
-                this.#withID(target),
-                'rx',
-            )
+        inspector.onCreateEffectRelation = (parent, child) => {
+            const edge = toEdge(this.#withID(parent), this.#withID(child), 'effectrelation')
             this.cy.add({
                 group: 'edges',
                 ...edge,
@@ -67,31 +54,67 @@ export class Visualiser {
             this._updated()
         }
 
-        inspector.ondestroyrx = (source, target) => {
-            const id = edgeID(
-                VisualiserList.getID(source.ref),
-                VisualiserList.getID(target.ref),
-            )
+        inspector.onDestroyEffectRelation = (parent, child) => {
+            const id = edgeID(VisualiserList.getID(parent.ref), VisualiserList.getID(child.ref))
+            this.cy.getElementById(id).remove()
+            this._updated()
+        }
+
+        inspector.onDestroyNode = ({ ref }) => {
+            const id = VisualiserList.getID(ref)
+            this.cy.getElementById(id).data('livestatus', 'destroyed')
+            this._updated()
+        }
+
+        inspector.onGarbageCollectNode = ({ ref }) => {
+            const id = VisualiserList.getID(ref)
+            const val = this.#valueId(id)
+            VisualiserList.remove(ref)
+            this.cy.getElementById(id).remove()
+            this.cy.getElementById(val).remove()
+            this._updated()
+        }
+
+        inspector.onUpdateNode = ({ name, ref }) => {
+            const id = VisualiserList.getID(ref)
+            const data = toData({ name, ref, id })
+            this.cy.getElementById(id).data(data)
+            // this._updated()
+        }
+
+        inspector.onCreateReaction = (source, target) => {
+            const edge = toEdge(this.#withID(source), this.#withID(target), 'rx')
+            this.cy.add({
+                group: 'edges',
+                ...edge,
+            })
+            this._updated()
+        }
+
+        inspector.onDestroyReaction = (source, target) => {
+            const id = edgeID(VisualiserList.getID(source.ref), VisualiserList.getID(target.ref))
             this.cy.getElementById(id).remove()
             // this._updated()
         }
 
-        inspector.oneffectstartpending = ({ ref }) => {
+        inspector.onEffectStartPending = ({ ref }) => {
             const ele = this.cy.getElementById(VisualiserList.getID(ref))
             ele.data('state', 'pending')
             // this._updated()
         }
-        inspector.oneffectstoppending = ({ ref }) => {
+        inspector.onEffectStopPending = ({ ref }) => {
             const ele = this.cy.getElementById(VisualiserList.getID(ref))
             ele.data('state', '')
             // this._updated()
         }
 
+        inspector.onUpdateValue = ({ ref }, value) => {
+            const ele = this.cy.getElementById(this.#valueId(VisualiserList.getID(ref)))
+            ele.data('value', JSON.stringify(value))
+        }
+
         this.cy.on('tap', 'node', (evt) => {
-            console.log(
-                evt.target._private.data.ref.deref(),
-                evt.target._private.data,
-            )
+            console.log(evt.target._private.data.ref.deref(), evt.target._private.data)
         })
     }
 

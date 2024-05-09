@@ -1,54 +1,60 @@
-import { EffectRoot } from './effect'
-import { AlreadyDestroyed } from './errors.ts'
-
+import { $effect } from './'
+//
+// /**
+//  * Component lifecycle is a render-once kind of function, updates should be done
+//  * via surgically-precise $effects.
+//  */
+// export class NanoComponent<T extends Element> {
+//     get destroyed(): boolean {
+//         return this._destroyed
+//     }
+//
+//     private _destroyed = false
+//
+//     attachTo: T
+//     /**
+//      *
+//      * @param attachTo
+//      * @param render Function that handles creation of effects, dom, etc in a synchronous root context. Returns a cleanup function
+//      */
+//     constructor(attachTo: T, render: (node: T) => (() => void) | void, name?: string) {
+//         this.attachTo = attachTo
+//         $effect.pre(() => {
+//             if (this._destroyed) throw new AlreadyDestroyedError()
+//             if (this.onMount) {
+//                 $effect(() => {
+//                     untrack(() => this.onMount!())
+//                 }, 'onmount callback')
+//             }
+//             return render(this.attachTo)
+//         }, 'c-' + name)
+//     }
+//
+//     readonly onMount: undefined | (() => {})
+//
+//     destroy() {
+//         if (this._destroyed) throw new AlreadyDestroyedError()
+//         this._destroyed = true
+//     }
+// }
+//
 /**
- * Component lifecycle is a render-once kind of function, updates should be done
- * via surgically-precise $effects.
+ * Returns a function that creates a component, which is actually just a
+ * @param attachTo
+ * @param render function that is called when the component is instantiated and returns a destroy function
+ * @param name
  */
-export class NanoComponent<T extends Element> {
-    get destroyed(): boolean {
-        return this._destroyed
-    }
-
-    effectRoot: EffectRoot
-    private _destroyed = false
-
-    attachTo: T
-    /**
-     *
-     * @param attachTo
-     * @param render Function that handles creation of effects, dom, etc in a synchronous root context. Returns a cleanup function
-     */
-    constructor(
-        attachTo: T,
-        render: (node: T) => (() => void) | void,
-        name?: string,
-    ) {
-        this.attachTo = attachTo
-        this.effectRoot = new EffectRoot(() => {
-            if (this._destroyed) throw new AlreadyDestroyed()
-            // This should only run once!
-            return render(this.attachTo)
-        }, name)
-        this.onMount()
-    }
-
-    onDestroy() {}
-
-    onMount() {}
-
-    destroy() {
-        if (this._destroyed) throw new AlreadyDestroyed()
-        this._destroyed = true
-        this.effectRoot.destroy()
-        this.onDestroy()
-    }
-}
-
-export function $component<T extends Element>(
-    attachTo: T,
-    render: (node: T) => (() => void) | void,
+export function $component<Props extends { [key: string]: any }>(
+    render: (node: Element, props: Props) => (() => void) | void,
     name?: string,
 ) {
-    return new NanoComponent(attachTo, render, name)
+    return (node: Element, props: Props, lastname?: '') => {
+        $effect.pre(
+            () => {
+                return render(node, props)
+            },
+            '' + (name || '') + (lastname || ''),
+        )
+    }
+    // return new NanoComponent(attachTo, render, name)
 }

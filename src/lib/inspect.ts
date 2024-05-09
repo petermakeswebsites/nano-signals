@@ -1,6 +1,7 @@
 import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { Effect, EffectRoot } from './effect.ts'
+import { Flag } from './dirtiness.ts'
 
 export type Allowed = Source<any> | Effect<any> | Derived<any> | EffectRoot
 export type AllowedEmitter = Source<any> | Derived<any>
@@ -10,8 +11,18 @@ export type DataPack<T extends Allowed> = {
     name: string
     ref: RefdItem<T>
 }
+
+function log(tags: string[] | string, ...packet: any) {
+    if (!Inspector.logging) return
+    packet = Inspector.stripRef ? packet.map((x: any) => (typeof x === 'object' && 'ref' in x ? x.name! : x)) : packet
+    console.log(JSON.stringify(tags), ...packet)
+}
+
 export const Inspector = new (class {
-    inspecting = false
+    inspecting = true
+    logging = false
+    stripRef = true
+    forceNames = true
 
     /**
      * Internal use, returns the id, name and ref in a neat little packet
@@ -35,21 +46,27 @@ export const Inspector = new (class {
     }
 
     _nextStep: undefined | (() => void)
+
     get readyForNextStep() {
+        log('MICROTASK', 'Ready for next step')
         return !!this._nextStep
     }
 
     _setNextStep(nextStep: () => void) {
+        log('MICROTASK', 'Next step set')
         this._nextStep = () => {
             this._nextStep = undefined
+            log('MICROTASK', 'Next step running')
             nextStep()
             if (this._nextStep === undefined) {
-                this.onnextstepdone?.()
+                log('MICROTASK', 'Next step done')
+                this.onNextStepDone?.()
             } else {
-                this.onreadyfornextstep?.()
+                log('MICROTASK', 'Detected another step, ready')
+                this.onReadyForNextStep?.()
             }
         }
-        this.onreadyfornextstep?.()
+        this.onReadyForNextStep?.()
     }
 
     /**
@@ -60,10 +77,8 @@ export const Inspector = new (class {
     doNextStep() {
         if (!this.#stepping) throw new Error('Stepping mode disabled')
         if (!this._nextStep) throw new Error('Next step not found!')
+        // Inside of this function is already logged
         this._nextStep()
-        if (this._nextStep === undefined) {
-            this.onnextstepdone?.()
-        }
     }
 
     /**
@@ -71,7 +86,7 @@ export const Inspector = new (class {
      */
     enableSteppingMode() {
         this.#stepping = true
-        this.onstartstepping?.()
+        this.onStartStepping?.()
     }
 
     /**
@@ -80,87 +95,78 @@ export const Inspector = new (class {
     disableSteppingMode() {
         this.#stepping = false
         this._nextStep?.()
-        if (this._nextStep === undefined) {
-            this.onnextstepdone?.()
-        }
-        this.onstopstepping?.()
+        this.onStopStepping?.()
     }
 
-    onstartstepping?: () => void
-    onstopstepping?: () => void
-    onnextstepdone?: () => void
-    onreadyfornextstep?: () => void
+    onStartStepping?: () => void
+    onStopStepping?: () => void
+    onNextStepDone?: () => void
+    onReadyForNextStep?: () => void
 
-    oncreatenode?: (pack: DataPack<Allowed>) => void
-    ondestroynode?: (pack: DataPack<Allowed>) => void
-    ongarbagecollectnode?: (pack: DataPack<Allowed>) => void
-    onupdatenode?: (pack: DataPack<Allowed>) => void
-    oncreaterx?: (
-        source: DataPack<AllowedEmitter>,
-        target: DataPack<AllowedReceiver>,
-    ) => void
-    ondestroyrx?: (
-        source: DataPack<AllowedEmitter>,
-        target: DataPack<AllowedReceiver>,
-    ) => void
-    oncreatedep?: (
-        source: DataPack<AllowedReceiver>,
-        target: DataPack<AllowedEmitter>,
-    ) => void
-    ondestroydep?: (
-        source: DataPack<AllowedReceiver>,
-        target: DataPack<AllowedEmitter>,
-    ) => void
-    oneffectstartpending?: (source: DataPack<Effect<any>>) => void
-    oneffectstoppending?: (source: DataPack<Effect<any>>) => void
+    onCreateNode?: (pack: DataPack<Allowed>) => void
+    onDestroyNode?: (pack: DataPack<Allowed>) => void
+    onGarbageCollectNode?: (pack: DataPack<Allowed>) => void
+    onUpdateNode?: (pack: DataPack<Allowed>) => void
+    onCreateReaction?: (source: DataPack<AllowedEmitter>, target: DataPack<AllowedReceiver>) => void
+    onDestroyReaction?: (source: DataPack<AllowedEmitter>, target: DataPack<AllowedReceiver>) => void
+    onEffectStartPending?: (source: DataPack<Effect<any>>) => void
+    onEffectStopPending?: (source: DataPack<Effect<any>>) => void
+
+    onUpdateValue?: (source: DataPack<AllowedEmitter>, value: any) => void
+
+    onCreateEffectRelation?: (parent: DataPack<Effect<any> | EffectRoot>, child: DataPack<Effect<any>>) => void
+    onDestroyEffectRelation?: (parent: DataPack<Effect<any> | EffectRoot>, child: DataPack<Effect<any>>) => void
 
     readonly #registry = new FinalizationRegistry<RefdItem<any>>((ref) => {
         const data = this._getData(ref)
+        log('REGISTRY', 'Item garbage collected:' + data.name)
         this.#purge(ref)
-        this.ongarbagecollectnode?.(data)
+        this.onGarbageCollectNode?.(data)
     })
+
+    _createEffectRelation(parent: RefdItem<Effect<any> | EffectRoot>, child: RefdItem<Effect<any>>) {
+        const parentData = this._getData(parent)
+        const childData = this._getData(child)
+        log('EFFECT', 'Created effect relation:', parentData, childData)
+        this.onCreateEffectRelation?.(parentData, childData)
+    }
+
+    _destroyEffectRelation(parent: RefdItem<Effect<any> | EffectRoot>, child: RefdItem<Effect<any>>) {
+        const parentData = this._getData(parent)
+        const childData = this._getData(child)
+        log('EFFECT', 'Removed effect relation:', parentData, childData)
+        this.onDestroyEffectRelation?.(this._getData(parent), this._getData(child))
+    }
 
     /**
      * As an optimisation, deriveds are marked dirty before processing
      * at the end of batch (or as needed within it)
      * @param derived
      */
-    _registerMarkDirty(derived: RefdItem<Derived<any>>) {
-        this.onupdatenode?.(this._getData(derived))
+    _registerDirtinessChange(derived: RefdItem<Derived<any>>, flag: Flag) {
+        const data = this._getData(derived)
+        log('DIRTINESS', 'Dirtiness changed to:', data, flag)
+        this.onUpdateNode?.(data)
     }
 
-    /**
-     * After a derived is processed, it is marked clean
-     * @param derived
-     */
-    _registerMarkClean(derived: RefdItem<Derived<any>>) {
-        this.onupdatenode?.(this._getData(derived))
+    _createRx(source: RefdItem<AllowedEmitter>, target: RefdItem<AllowedReceiver>) {
+        const sourcedata = this._getData(source)
+        const targetdata = this._getData(target)
+        log('RX', 'Reaction created between:', sourcedata, targetdata)
+        this.onCreateReaction?.(sourcedata, targetdata)
     }
 
-    _createRx(
-        source: RefdItem<AllowedEmitter>,
-        target: RefdItem<AllowedReceiver>,
-    ) {
-        this.oncreaterx?.(this._getData(source), this._getData(target))
-    }
-    _removeRx(
-        source: RefdItem<AllowedEmitter>,
-        target: RefdItem<AllowedReceiver>,
-    ) {
-        this.ondestroyrx?.(this._getData(source), this._getData(target))
+    _removeRx(source: RefdItem<AllowedEmitter>, target: RefdItem<AllowedReceiver>) {
+        const sourcedata = this._getData(source)
+        const targetdata = this._getData(target)
+        log('RX', 'Reaction removed from', sourcedata, targetdata)
+        this.onDestroyReaction?.(sourcedata, targetdata)
     }
 
-    _createDep(
-        source: RefdItem<AllowedReceiver>,
-        target: RefdItem<AllowedEmitter>,
-    ) {
-        this.oncreatedep?.(this._getData(source), this._getData(target))
-    }
-    _removeDep(
-        source: RefdItem<AllowedReceiver>,
-        target: RefdItem<AllowedEmitter>,
-    ) {
-        this.ondestroydep?.(this._getData(source), this._getData(target))
+    _updateValue(source: RefdItem<AllowedEmitter>, value: any) {
+        const sourcedata = this._getData(source)
+        log('VALUE', 'Value changed for', source, JSON.stringify(value))
+        this.onUpdateValue?.(sourcedata, value)
     }
 
     /**
@@ -168,11 +174,15 @@ export const Inspector = new (class {
      * @param effect
      */
     _registerPendingEffect(effect: RefdItem<Effect<any>>) {
-        this.oneffectstartpending?.(this._getData(effect))
+        const sourcedata = this._getData(effect)
+        log('PENDING_EFFECT', 'Pending effect created', sourcedata)
+        this.onEffectStartPending?.(sourcedata)
     }
 
     _removePendingEffect(effect: RefdItem<Effect<any>>) {
-        this.oneffectstoppending?.(this._getData(effect))
+        const sourcedata = this._getData(effect)
+        log('PENDING_EFFECT', 'Pending effect removed', sourcedata)
+        this.onEffectStopPending?.(sourcedata)
     }
 
     /**
@@ -195,10 +205,7 @@ export const Inspector = new (class {
      * @param _name
      * @private
      */
-    #addToCatalogues<T extends Allowed>(
-        ref: RefdItem<T>,
-        _name?: string,
-    ): DataPack<T> {
+    #addToCatalogues<T extends Allowed>(ref: RefdItem<T>, _name?: string): DataPack<T> {
         const name = _name || ''
         this.nameCatalogue.set(ref, name)
         return {
@@ -214,10 +221,7 @@ export const Inspector = new (class {
      */
     #addToRegistry(item: RefdItem<any>) {
         const ref = item.deref()
-        if (!ref)
-            throw new Error(
-                `Item created without reference, already collected?`,
-            )
+        if (!ref) throw new Error(`Item created without reference, already collected?`)
         this.#registry.register(ref, item, item)
     }
 
@@ -228,9 +232,14 @@ export const Inspector = new (class {
      * @param name
      */
     _newItem<T extends Allowed>(item: RefdItem<T>, name?: string) {
+        if (this.forceNames && !name) {
+            console.error(item.deref())
+            throw new Error(`No name`)
+        }
         const pack = this.#addToCatalogues(item, name)
+        log('ITEM', 'Creating item', pack)
         this.#addToRegistry(item)
-        this.oncreatenode?.(pack)
+        this.onCreateNode?.(pack)
     }
 
     /**
@@ -241,7 +250,9 @@ export const Inspector = new (class {
      * to derived as well, which can be owned or unowned. Too complicated for a simple library.
      * @param item
      */
-    _destroyItem(item: RefdItem<Effect<any>>) {
-        this.ondestroynode?.(this._getData(item))
+    _destroyItem(item: RefdItem<Effect<any> | EffectRoot>) {
+        const pack = this._getData(item)
+        log('ITEM', 'Destroying item', pack)
+        this.onDestroyNode?.(pack)
     }
 })()

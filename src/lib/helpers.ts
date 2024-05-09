@@ -1,7 +1,5 @@
 import { Derived } from './derived.ts'
-import { $get, Effect } from './effect.ts'
-import { Source } from './source.ts'
-import { NanoComponent } from './component.ts'
+import { $effect, $get } from './effect.ts'
 
 /**
  * @param node
@@ -12,13 +10,19 @@ export function $innertext(node: { innerText: string }, text: string) {
     return () => (node.innerText = '')
 }
 
-export function $text(str: string) {
+export function $innerhtml(node: { innerHTML: string }, text: string) {
+    node.innerHTML = text
+    return () => (node.innerHTML = '')
+}
+
+export function text(str: string) {
     return document.createTextNode(str)
 }
 
-export function $html(node: { innerHTML: string }, text: string) {
-    node.innerHTML = text
-    return () => (node.innerHTML = '')
+export function html(html: string) {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    return [...doc.body.childNodes]
 }
 
 /**
@@ -32,7 +36,7 @@ export function $if(
     name?: string,
 ) {
     const isTrue = new Derived(fn, 'if' + (name ? ' ' + name : ''))
-    new Effect(() => {
+    $effect.pre(() => {
         if ($get(isTrue)) {
             return render(node)
         } else {
@@ -49,10 +53,7 @@ export function $if(
 //     element.addEventListener<K>(evt, fn)
 // }
 
-export function $child<T extends Element, Q extends Element | Text>(
-    parent: T,
-    child: Q,
-) {
+export function $child<T extends Element, Q extends Element | Text>(parent: T, child: Q) {
     parent.appendChild(child)
     return () => {
         parent.removeChild(child)
@@ -64,10 +65,7 @@ export function $class<T extends Element>(element: T, className: string) {
     return () => element.classList.remove(className)
 }
 
-export function $children<T extends Element, Q extends (Element | Text)[]>(
-    parent: T,
-    ...children: Q
-) {
+export function $children<T extends Element, Q extends (Element | Text)[]>(parent: T, ...children: Q) {
     children.forEach((child) => parent.appendChild(child))
     return () => {
         children.forEach((child) => parent.removeChild(child))
@@ -84,15 +82,11 @@ export function $children<T extends Element, Q extends (Element | Text)[]>(
 //     }
 // }
 
-export function $create<T extends keyof HTMLElementTagNameMap>(
+export function create<T extends keyof HTMLElementTagNameMap>(tagName: T): HTMLElementTagNameMap[T]
+export function create<T extends keyof SVGElementTagNameMap>(tagName: T): SVGElementTagNameMap[T]
+export function create<T extends keyof (HTMLElementTagNameMap | SVGElementTagNameMap)>(
     tagName: T,
-): HTMLElementTagNameMap[T]
-export function $create<T extends keyof SVGElementTagNameMap>(
-    tagName: T,
-): SVGElementTagNameMap[T]
-export function $create<
-    T extends keyof (HTMLElementTagNameMap | SVGElementTagNameMap),
->(tagName: T): HTMLElement | SVGElement {
+): HTMLElement | SVGElement {
     const element = document.createElement(tagName)
     return element
 }
@@ -102,34 +96,22 @@ export function $create<
  */
 export function $each<T, U extends Element, Q = number>(
     node: U,
-    arr: Source<T[]>,
-    fn: (item: T, index: number, node: U) => void | (() => void),
-    id?: (item: T, index: number) => Q,
-    name?: string,
+    arr: T[],
+    render: (item: T, index: number, node: U) => void | (() => void),
+    keyBy?: (item: T, index: number) => Q,
 ) {
-    if (id === undefined)
-        (id = (_, index) => index as Q),
-            new Effect(
-                () => {
-                    const roots = new Map(
-                        $get(arr).map((item, index) => {
-                            return [
-                                id!(item, index),
-                                fn(item, index, node),
-                            ] as const
-                        }),
-                    )
+    if (keyBy === undefined) keyBy = (_, index) => index as Q
+    const roots = new Map(
+        arr.map((item, index) => {
+            const renderReturn = render(item, index, node)
+            const key = keyBy!(item, index)
+            return [key, renderReturn] as const
+        }),
+    )
 
-                    return () => {
-                        for (const [_, destroyFn] of [...roots]) {
-                            destroyFn?.()
-                        }
-                    }
-                },
-                'each ' + (name ? ' ' + name : ''),
-            )
-}
-
-export function $destroyer(comp: NanoComponent<any>) {
-    return () => comp.destroy()
+    return () => {
+        for (const [_, destroyFn] of [...roots]) {
+            destroyFn?.()
+        }
+    }
 }

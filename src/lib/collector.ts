@@ -31,10 +31,6 @@ export class DepCollector<T> {
                     )
                 }
                 Inspector._createRx(dep.weakref, this.recordingReaction.weakref)
-                Inspector._createDep(
-                    this.recordingReaction.weakref,
-                    dep.weakref,
-                )
             }
             this.recordingReaction.deps.add(dep)
             dep.rx.add(this.recordingReaction)
@@ -62,7 +58,6 @@ export function untrack<T>(fn: () => T) {
 export function disconnect_deps(fx: Effect<any> | Derived<any>) {
     for (const d of [...fx.deps]) {
         if (Inspector.inspecting) {
-            Inspector._removeDep(fx.weakref, d.weakref)
             Inspector._removeRx(d.weakref, fx.weakref)
         }
         fx.deps.delete(d)

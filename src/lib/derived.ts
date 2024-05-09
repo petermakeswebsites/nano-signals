@@ -1,8 +1,9 @@
 import { Source } from './source'
 import { type Effect } from './effect.ts'
-import { Flag } from './batch.ts'
 import { collect_deps, disconnect_deps } from './collector.ts'
 import { Inspector } from './inspect.ts'
+
+import { Flag } from './dirtiness.ts'
 
 /**
  * An effect and a source back-to-back, stores values
@@ -22,7 +23,10 @@ export class Derived<T> {
             disconnect_deps(this)
             this._value = collect_deps(this.fn, this)
             this.flag = Flag.CLEAN
-            if (Inspector) Inspector._registerMarkClean(this.weakref)
+            if (Inspector) {
+                Inspector._updateValue(this.weakref, this._value)
+                Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
+            }
         }
         return this._value
     }
@@ -32,12 +36,15 @@ export class Derived<T> {
         name?: string,
     ) {
         if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
+
         // We basically set up a private root with a private effect.
         // This root might have no owner, or it might be owned by another root
         // Not exactly sure if this reflects Svelte's implementation
         this._value = collect_deps(fn, this)
+
         this.flag = Flag.CLEAN
-        if (Inspector) Inspector._registerMarkClean(this.weakref)
+        if (Inspector)
+            Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
     }
 }
 

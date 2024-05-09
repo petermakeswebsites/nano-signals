@@ -1,19 +1,8 @@
 export { $effect, Effect, EffectRoot, $root, $set, $get } from './effect.ts'
 export { Source, $source } from './source.ts'
 export { Derived, $derived } from './derived.ts'
-export { NanoComponent, $component } from './component.ts'
-export {
-    $if,
-    $html,
-    $innertext,
-    $class,
-    $each,
-    $create,
-    $child,
-    $children,
-    $destroyer,
-} from './helpers.ts'
-export { Batch, $batch } from './batch.ts'
+export { $component } from './component.ts'
+export { $if, $innertext, $class, $each, create, $child, $children, html } from './helpers.ts'
 export { untrack } from './collector.ts'
 export {
     Inspector,
@@ -23,3 +12,5 @@ export {
     type RefdItem,
     type DataPack,
 } from './inspect.ts'
+export { tick } from './microtask.ts'
+export { Flag } from './dirtiness.ts'

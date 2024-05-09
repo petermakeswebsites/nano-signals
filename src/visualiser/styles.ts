@@ -1,4 +1,5 @@
 import cytoscape from 'cytoscape'
+import { Flag } from '../lib'
 
 export const cytoStyle: cytoscape.Stylesheet[] = [
     {
@@ -8,8 +9,29 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
             label: 'data(name)',
             'text-valign': 'center',
             color: '#fff',
+            shape: 'ellipse',
             'text-outline-width': 2,
             'text-outline-color': '#888',
+            'font-size': 12,
+        },
+    },
+    {
+        selector: 'node[type="value"]', // this is the parent, backdrop
+        style: {
+            shape: 'ellipse',
+            'text-valign': 'bottom',
+            label: 'data(value)',
+            'background-color': 'transparent',
+            'background-opacity': 0,
+            'border-opacity': 0,
+            color: '#000',
+            'overlay-padding': '0',
+            'overlay-opacity': 0,
+            'overlay-color': 'transparent',
+            'text-outline-color': '#eee',
+            'text-max-width': '150px', // Set maximum width of text (in pixels)
+            'text-wrap': 'ellipsis', // Ensures text that exceeds the width ends with an ellipsis
+            // 'text-overflow-wrap': 'ellipsis', // Use 'ellipsis' to prevent wrapping
             'font-size': 12,
         },
     },
@@ -26,9 +48,15 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
         },
     },
     {
-        selector: 'node[state="dirty"]',
+        selector: `node[state=${Flag.DIRTY}]`,
         style: {
             'text-outline-color': '#f00', // Changed for visibility
+        },
+    },
+    {
+        selector: `node[state=${Flag.MAYBE_DIRTY}]`,
+        style: {
+            'text-outline-color': '#f80', // Changed for visibility
         },
     },
     {
@@ -85,6 +113,15 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
         style: {
             'line-color': '#f00',
             'target-arrow-color': '#f00',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'unbundled-bezier',
+        },
+    },
+    {
+        selector: 'edge[type="effectrelation"]',
+        style: {
+            'line-color': '#0ff',
+            'target-arrow-color': '#00f',
             'target-arrow-shape': 'triangle',
             'curve-style': 'unbundled-bezier',
         },

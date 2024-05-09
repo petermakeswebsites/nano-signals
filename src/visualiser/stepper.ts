@@ -7,21 +7,21 @@ export class Stepper {
         step: HTMLButtonElement,
         play: HTMLButtonElement,
     ) {
-        inspector.onstartstepping = () => {
+        inspector.onStartStepping = () => {
             play.disabled = false
             pause.disabled = true
         }
 
-        inspector.onstopstepping = () => {
+        inspector.onStopStepping = () => {
             play.disabled = true
             pause.disabled = false
         }
 
-        inspector.onnextstepdone = () => {
+        inspector.onNextStepDone = () => {
             step.disabled = true
         }
 
-        inspector.onreadyfornextstep = () => {
+        inspector.onReadyForNextStep = () => {
             step.disabled = false
         }
 

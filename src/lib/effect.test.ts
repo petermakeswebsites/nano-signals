@@ -1,28 +1,27 @@
 import {
     $effect,
-    _resetAllGlobalTrackers,
+    _reset_all_global_trackers,
     $get,
     $set,
     $root,
 } from './effect.ts'
 import { describe, beforeEach, vi, it, expect, Mock } from 'vitest'
 import { $source, Source } from './source.ts'
-import { $batch, Batch } from './batch.ts'
-import { $derived } from './derived.ts'
 import { DepCollector } from './collector.ts'
+import { _kill_all_microtasks, tick } from './microtask.ts'
 
 describe('reactivity tests', () => {
     beforeEach(() => {
-        _resetAllGlobalTrackers()
-        Batch.currentBatch = undefined
+        _reset_all_global_trackers()
         DepCollector.currentCollecting = undefined
         DepCollector.untrack = false
+        _kill_all_microtasks()
     })
 
-    it('effect should fire in a root context', () => {
+    it('pre-effect should fire in a root context', () => {
         const spy = vi.fn()
         $root(() => {
-            $effect(() => {
+            $effect.pre(() => {
                 spy()
             })
         })
@@ -75,28 +74,30 @@ describe('reactivity tests', () => {
             expect(spy).not.toHaveBeenCalled()
         })
 
-        it('should call cleanup after source changes with destroy set to false', () => {
+        it('should call cleanup after source changes with destroy set to false', async () => {
             $set(source, 1)
+            await tick()
             expect(spy).toHaveBeenNthCalledWith(1, false)
             expect(spy).toHaveBeenCalledTimes(1)
         })
 
-        it('should still call only once if source is the same value', () => {
+        it('should still call only once if source is the same value', async () => {
             $set(source, 1)
             $set(source, 1)
+            await tick()
             expect(spy).toHaveBeenNthCalledWith(1, false)
             expect(spy).toHaveBeenCalledTimes(1)
         })
 
-        it('should call twice when value changes twice', () => {
+        it('should call once when value changes twice, but not cleanup', async () => {
             $set(source, 1)
             $set(source, 2)
+            await tick()
             expect(spy).toHaveBeenNthCalledWith(1, false)
-            expect(spy).toHaveBeenNthCalledWith(2, false)
-            expect(spy).toHaveBeenCalledTimes(2)
+            expect(spy).toHaveBeenCalledTimes(1)
         })
 
-        it('should call with destroy function set to true', () => {
+        it('destruction should be synchronous', () => {
             root.destroy()
             expect(spy).toHaveBeenNthCalledWith(1, true)
             expect(spy).toHaveBeenCalledTimes(1)
@@ -132,7 +133,7 @@ describe('reactivity tests', () => {
         })
     })
 
-    describe('basic reactivity', () => {
+    describe('basic reactivity for sync (pre) effects', () => {
         // @ts-ignore
         let fx: Effect<any>
         // @ts-ignore
@@ -145,7 +146,7 @@ describe('reactivity tests', () => {
             spy = vi.fn()
             count = $source(0)
             root = $root(() => {
-                fx = $effect(() => {
+                fx = $effect.pre(() => {
                     spy($get(count))
                 })
             })
@@ -163,9 +164,9 @@ describe('reactivity tests', () => {
             expect(spy).toHaveBeenNthCalledWith(1, 0)
         })
 
-        it('should be called twice after a change', () => {
+        it('should only be called once after a change without tick()', () => {
             $set(count, 1)
-            expect(spy).toHaveBeenNthCalledWith(2, 1)
+            expect(spy).toHaveBeenNthCalledWith(1, 0)
         })
 
         describe('disposal', () => {
@@ -180,73 +181,6 @@ describe('reactivity tests', () => {
                 expect(fx.deps).not.toContain(count)
                 expect(count.rx).not.toContain(fx)
             })
-        })
-    })
-
-    it('roots are not there for you and you only', () => {})
-
-    describe('batch tests', () => {
-        it('non-batched should fire multiple times', () => {
-            const spy = vi.fn()
-            const a = $source(1)
-            const b = $source(1)
-
-            $root(() => {
-                $effect(() => {
-                    spy($get(a) + $get(b))
-                })
-            })
-
-            $set(a, 2)
-            $set(b, 2)
-
-            expect(spy).toHaveBeenNthCalledWith(1, 2) // First initial call when a = 1, b = 1
-            expect(spy).toHaveBeenNthCalledWith(2, 3) // Second call when a = 2, b = 1
-            expect(spy).toHaveBeenNthCalledWith(3, 4) // Third call when a = 2, b = 2
-            expect(spy).toHaveBeenCalledTimes(3)
-        })
-
-        it('batched should fire once', () => {
-            const spy = vi.fn()
-            const a = $source(1)
-            const b = $source(1)
-
-            $root(() => {
-                $effect(() => {
-                    spy($get(a) + $get(b))
-                })
-            })
-
-            $batch(() => {
-                $set(a, 2)
-                $set(b, 2)
-            })
-
-            expect(spy).toHaveBeenNthCalledWith(1, 2) // First initial call when a = 1, b = 1
-            expect(spy).toHaveBeenNthCalledWith(2, 4) // Third call when a = 2, b = 2
-            expect(spy).toHaveBeenCalledTimes(2)
-        })
-
-        it('deriveds should fire once after', () => {
-            const spy = vi.fn()
-            const a = $source(1)
-            const b = $source(1)
-            const c = $derived(() => $get(a) + $get(b))
-
-            $root(() => {
-                $effect(() => {
-                    spy(`${$get(a)} ${$get(b)} ${$get(c)}`)
-                })
-            })
-
-            $batch(() => {
-                $set(a, 2)
-                $set(b, 2)
-            })
-
-            expect(spy).toHaveBeenNthCalledWith(1, '1 1 2') // First initial call when a = 1, b = 1, c = 2
-            expect(spy).toHaveBeenNthCalledWith(2, '2 2 4') // Third call when a = 2, b = 2
-            expect(spy).toHaveBeenCalledTimes(2)
         })
     })
 })
