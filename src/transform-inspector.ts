@@ -8,5 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const play = document.getElementById('play') as HTMLButtonElement
     const step = document.getElementById('step') as HTMLButtonElement
     const pause = document.getElementById('pause') as HTMLButtonElement
-    new Stepper(Inspector, pause, step, play)
+    const phase = document.getElementById('phase') as HTMLButtonElement
+    new Stepper(Inspector, pause, step, play, phase)
 })

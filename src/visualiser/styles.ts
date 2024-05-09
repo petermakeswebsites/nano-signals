@@ -11,8 +11,8 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
             color: '#fff',
             shape: 'ellipse',
             'text-outline-width': 2,
-            'text-outline-color': '#888',
-            'font-size': 12,
+            'text-outline-color': '#555',
+            'font-size': 14,
         },
     },
     {
@@ -50,19 +50,15 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
     {
         selector: `node[state=${Flag.DIRTY}]`,
         style: {
-            'text-outline-color': '#f00', // Changed for visibility
+            'border-color': '#007',
+            'border-width': '5',
+            'text-outline-color': '#00f', // Changed for visibility
         },
     },
     {
         selector: `node[state=${Flag.MAYBE_DIRTY}]`,
         style: {
-            'text-outline-color': '#f80', // Changed for visibility
-        },
-    },
-    {
-        selector: 'node[state="pending"]',
-        style: {
-            'text-outline-color': '#00f',
+            'text-outline-color': '#00f', // Changed for visibility
         },
     },
     // {

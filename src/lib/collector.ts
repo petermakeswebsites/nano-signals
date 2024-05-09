@@ -21,17 +21,7 @@ export class DepCollector<T> {
 
     add(dep: Source<any> | Derived<any>) {
         if (!DepCollector.untrack) {
-            if (Inspector.inspecting) {
-                if (this.recordingReaction.deps.has(dep)) {
-                    throw new Error('Collecting dep, already is a dependency')
-                }
-                if (dep.rx.has(this.recordingReaction)) {
-                    throw new Error(
-                        `Dependency already has the collector as a reaction`,
-                    )
-                }
-                Inspector._createRx(dep.weakref, this.recordingReaction.weakref)
-            }
+            if (Inspector.inspecting) Inspector._createRx(dep.weakref, this.recordingReaction.weakref)
             this.recordingReaction.deps.add(dep)
             dep.rx.add(this.recordingReaction)
         }
@@ -40,10 +30,7 @@ export class DepCollector<T> {
     readonly result: T
 }
 
-export function collect_deps<T>(
-    fn: () => T,
-    recordingReaction: Effect<any> | Derived<any>,
-) {
+export function collect_deps<T>(fn: () => T, recordingReaction: Effect<any> | Derived<any>) {
     return new DepCollector(fn, recordingReaction).result
 }
 

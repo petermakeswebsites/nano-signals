@@ -17,10 +17,12 @@ export class Car {
     readonly name: string
     fuel: Source<number>
     lowFuel: Derived<boolean>
+    message
     constructor(name: string, startingFuel = 50) {
         this.name = name
         this.fuel = $source(startingFuel, 'fuel')
         this.lowFuel = $derived(() => $get(this.fuel) < 40, 'fuel < 40')
+        this.message = $derived(() => ($get(this.lowFuel) ? 'holy moly fill it up!' : 'no need to fill'), 'msg')
     }
 
     drive(km: number) {

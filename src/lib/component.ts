@@ -58,3 +58,6 @@ export function $component<Props extends { [key: string]: any }>(
     }
     // return new NanoComponent(attachTo, render, name)
 }
+
+export type ChildrenDestroy = () => void
+export type Children = (node: Element) => ChildrenDestroy

@@ -7,6 +7,13 @@ const queuedEffects = new Set<Effect<any>>()
 const queuedMaybeEffects = new Set<Effect<any>>()
 
 let tickCallbacks: (() => any)[] = []
+export enum Phase {
+    DONE,
+    AWAITING_FLUSH,
+    PROCESSING_MAYBES,
+    ORGANISING_EFFECT_TREE,
+    APPLYING_EFFECTS,
+}
 
 /**
  * For testing a debug purposes
@@ -46,12 +53,13 @@ function run_tick_promises() {
  */
 export function queue_microtask_effect(effect: Effect<any>, flag: Flag.DIRTY | Flag.MAYBE_DIRTY) {
     add_to_appropriate_set(effect, flag)
+    if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.AWAITING_FLUSH)
     set_microtask_or_inspect()
-    if (Inspector.inspecting) Inspector._registerPendingEffect(effect.weakref)
 }
 
 function flush_microtasks() {
     if (no_queued_effects()) {
+        if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.DONE)
         run_tick_promises()
         return
     }
@@ -59,27 +67,33 @@ function flush_microtasks() {
     // The first thing we need to do is get rid of the maybe dirties
     const firstMaybe = extract_first_element_of_set(queuedMaybeEffects)
     if (firstMaybe) {
+        // Let's process this and see if it's dirty or clean
         const flag = firstMaybe.process_deps_dirtiness()
+        if (Inspector.inspecting) Inspector._registerDirtinessChange(firstMaybe.weakref, flag)
         if (flag === Flag.DIRTY) {
             queuedEffects.add(firstMaybe)
-        } else {
-            if (Inspector.inspecting) Inspector._removePendingEffect(firstMaybe.weakref)
         }
-        // This basically re-runs the function
+
+        // This basically re-runs the function, to go to the next step or re-do this one
+        if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.PROCESSING_MAYBES)
         return set_microtask_or_inspect()
     }
 
     // No maybes, lets organise
     if (queuedEffects.size) {
         organise_dirty_effects()
+        if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.ORGANISING_EFFECT_TREE)
         return set_microtask_or_inspect()
     }
 
     // Now everything's organised
     const firstOrganised = extract_first_element_of_set(queuedOrganisedEffects)
     if (firstOrganised) {
-        // Definitely dirty, so lets just run it
-        if (Inspector.inspecting) Inspector._removePendingEffect(firstOrganised.weakref)
+        // Definitely dirty, so lets just run it and clean it
+        if (Inspector.inspecting) {
+            Inspector._registerDirtinessChange(firstOrganised.weakref, Flag.CLEAN)
+            Inspector._microtaskPhaseChange(Phase.APPLYING_EFFECTS)
+        }
         firstOrganised.rerun()
     }
     return set_microtask_or_inspect()
@@ -110,7 +124,7 @@ function organise_dirty_effects() {
         if (isNonRedundant) {
             queuedOrganisedEffects.add(effect)
         } else {
-            if (Inspector.inspecting) Inspector._removePendingEffect(effect.weakref) // Now only called once per effect after confirming it's redundant
+            if (Inspector.inspecting) Inspector._registerDirtinessChange(effect.weakref, Flag.CLEAN) // Now only called once per effect after confirming it's redundant
         }
     }
 
@@ -127,7 +141,10 @@ function extract_first_element_of_set<T>(set: Set<T>): T | undefined {
 
 function set_microtask_or_inspect() {
     // If there are queued effects, it means that the next microtask is already set
-    if (no_queued_effects()) return
+    // if (no_queued_effects()) {
+    //     if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.DONE)
+    //     return
+    // }
     if (Inspector.stepping) {
         Inspector._setNextStep(flush_microtasks)
     } else {
@@ -140,6 +157,7 @@ function no_queued_effects() {
 }
 
 function add_to_appropriate_set(effect: Effect<any>, flag: Flag.DIRTY | Flag.MAYBE_DIRTY) {
+    if (Inspector.inspecting) Inspector._registerDirtinessChange(effect.weakref, flag)
     if (flag === Flag.MAYBE_DIRTY) {
         // If it's already in the dirty laundry, we don't want to set it to a maybe
         if (!queuedEffects.has(effect)) queuedMaybeEffects.add(effect)

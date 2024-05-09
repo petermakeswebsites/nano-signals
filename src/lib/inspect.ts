@@ -2,6 +2,7 @@ import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { Effect, EffectRoot } from './effect.ts'
 import { Flag } from './dirtiness.ts'
+import { Phase } from './microtask.ts'
 
 export type Allowed = Source<any> | Effect<any> | Derived<any> | EffectRoot
 export type AllowedEmitter = Source<any> | Derived<any>
@@ -21,8 +22,17 @@ function log(tags: string[] | string, ...packet: any) {
 export const Inspector = new (class {
     inspecting = true
     logging = false
+
+    /**
+     * Remove direct referencing to items in logging, makes it so that garbage
+     * collection can take place
+     */
     stripRef = true
-    forceNames = true
+
+    /**
+     * Throw an error for any unnamed item
+     */
+    forceNames = false
 
     /**
      * Internal use, returns the id, name and ref in a neat little packet
@@ -106,16 +116,14 @@ export const Inspector = new (class {
     onCreateNode?: (pack: DataPack<Allowed>) => void
     onDestroyNode?: (pack: DataPack<Allowed>) => void
     onGarbageCollectNode?: (pack: DataPack<Allowed>) => void
-    onUpdateNode?: (pack: DataPack<Allowed>) => void
     onCreateReaction?: (source: DataPack<AllowedEmitter>, target: DataPack<AllowedReceiver>) => void
     onDestroyReaction?: (source: DataPack<AllowedEmitter>, target: DataPack<AllowedReceiver>) => void
-    onEffectStartPending?: (source: DataPack<Effect<any>>) => void
-    onEffectStopPending?: (source: DataPack<Effect<any>>) => void
 
     onUpdateValue?: (source: DataPack<AllowedEmitter>, value: any) => void
 
     onCreateEffectRelation?: (parent: DataPack<Effect<any> | EffectRoot>, child: DataPack<Effect<any>>) => void
     onDestroyEffectRelation?: (parent: DataPack<Effect<any> | EffectRoot>, child: DataPack<Effect<any>>) => void
+    onChangeDirtiness?: (pack: DataPack<AllowedReceiver>, flag: Flag) => void
 
     readonly #registry = new FinalizationRegistry<RefdItem<any>>((ref) => {
         const data = this._getData(ref)
@@ -138,15 +146,21 @@ export const Inspector = new (class {
         this.onDestroyEffectRelation?.(this._getData(parent), this._getData(child))
     }
 
+    onMicrotaskPhaseChange?: (phase: Phase) => void
+    _microtaskPhaseChange(phase: Phase) {
+        log('MICROTASK', 'Microtask phase change: ', phase)
+        this.onMicrotaskPhaseChange?.(phase)
+    }
+
     /**
      * As an optimisation, deriveds are marked dirty before processing
      * at the end of batch (or as needed within it)
      * @param derived
      */
-    _registerDirtinessChange(derived: RefdItem<Derived<any>>, flag: Flag) {
+    _registerDirtinessChange(derived: RefdItem<Derived<any> | Effect<any>>, flag: Flag) {
         const data = this._getData(derived)
         log('DIRTINESS', 'Dirtiness changed to:', data, flag)
-        this.onUpdateNode?.(data)
+        this.onChangeDirtiness?.(data, flag)
     }
 
     _createRx(source: RefdItem<AllowedEmitter>, target: RefdItem<AllowedReceiver>) {
@@ -167,22 +181,6 @@ export const Inspector = new (class {
         const sourcedata = this._getData(source)
         log('VALUE', 'Value changed for', source, JSON.stringify(value))
         this.onUpdateValue?.(sourcedata, value)
-    }
-
-    /**
-     * When an effect enters a pending state
-     * @param effect
-     */
-    _registerPendingEffect(effect: RefdItem<Effect<any>>) {
-        const sourcedata = this._getData(effect)
-        log('PENDING_EFFECT', 'Pending effect created', sourcedata)
-        this.onEffectStartPending?.(sourcedata)
-    }
-
-    _removePendingEffect(effect: RefdItem<Effect<any>>) {
-        const sourcedata = this._getData(effect)
-        log('PENDING_EFFECT', 'Pending effect removed', sourcedata)
-        this.onEffectStopPending?.(sourcedata)
     }
 
     /**

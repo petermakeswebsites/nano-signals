@@ -3,21 +3,15 @@ import cytoscape from 'cytoscape'
 
 type FullData<T extends Allowed> = DataPack<T> & { id: string }
 
-export function toData<T extends Allowed>({
-    ref,
-    name,
-    id,
-}: FullData<T>): cytoscape.NodeDefinition['data'] {
+export function toData<T extends Allowed>({ ref, name, id }: FullData<T>): cytoscape.NodeDefinition['data'] {
     const actualItem = ref.deref()
     if (actualItem === undefined) throw new Error(`Item was undefined!`)
 
     const data = { id, name, ref }
     if (actualItem instanceof Derived) {
-        const state = actualItem.flag
         return {
             ...data,
             type: 'derived',
-            state,
             level: 8,
         }
     } else if (actualItem instanceof Effect) {

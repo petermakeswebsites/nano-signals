@@ -21,10 +21,11 @@ export class Derived<T> {
     get value() {
         if (this.flag === Flag.DIRTY) {
             disconnect_deps(this)
+            const oldValue = this._value
             this._value = collect_deps(this.fn, this)
             this.flag = Flag.CLEAN
-            if (Inspector) {
-                Inspector._updateValue(this.weakref, this._value)
+            if (Inspector.inspecting) {
+                if (oldValue !== this._value) Inspector._updateValue(this.weakref, this._value)
                 Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
             }
         }
@@ -41,10 +42,10 @@ export class Derived<T> {
         // This root might have no owner, or it might be owned by another root
         // Not exactly sure if this reflects Svelte's implementation
         this._value = collect_deps(fn, this)
+        if (Inspector.inspecting) Inspector._updateValue(this.weakref, this._value)
 
         this.flag = Flag.CLEAN
-        if (Inspector)
-            Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
+        if (Inspector.inspecting) Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
     }
 }
 

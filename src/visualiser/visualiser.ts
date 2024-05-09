@@ -1,4 +1,4 @@
-import type { Allowed, Inspector, RefdItem } from '../lib'
+import { Allowed, Inspector, RefdItem, Source } from '../lib'
 import cytoscape from 'cytoscape'
 import { cytoStyle } from './styles.ts'
 import { VisualiserList } from './idlog.ts'
@@ -75,11 +75,11 @@ export class Visualiser {
             this._updated()
         }
 
-        inspector.onUpdateNode = ({ name, ref }) => {
+        inspector.onChangeDirtiness = ({ ref }, flag) => {
             const id = VisualiserList.getID(ref)
-            const data = toData({ name, ref, id })
-            this.cy.getElementById(id).data(data)
-            // this._updated()
+            this.cy.getElementById(id).data({
+                state: flag,
+            })
         }
 
         inspector.onCreateReaction = (source, target) => {
@@ -97,25 +97,53 @@ export class Visualiser {
             // this._updated()
         }
 
-        inspector.onEffectStartPending = ({ ref }) => {
-            const ele = this.cy.getElementById(VisualiserList.getID(ref))
-            ele.data('state', 'pending')
-            // this._updated()
-        }
-        inspector.onEffectStopPending = ({ ref }) => {
-            const ele = this.cy.getElementById(VisualiserList.getID(ref))
-            ele.data('state', '')
-            // this._updated()
-        }
-
         inspector.onUpdateValue = ({ ref }, value) => {
-            const ele = this.cy.getElementById(this.#valueId(VisualiserList.getID(ref)))
-            ele.data('value', JSON.stringify(value))
+            // Pop it!
+            this.pop(this.cy.getElementById(VisualiserList.getID(ref)))
+
+            // Update actual value
+            const valueNode = this.cy.getElementById(this.#valueId(VisualiserList.getID(ref)))
+            valueNode.data('value', JSON.stringify(value))
         }
 
         this.cy.on('tap', 'node', (evt) => {
+            // @ts-expect-error
+            globalThis.set = (e: any) => {
+                const r = evt.target._private.data.ref.deref()
+                if (!r) throw new Error('It was garbage collected!')
+                if (!(r instanceof Source)) throw new Error('Its not a source!')
+                r.set(e)
+            }
             console.log(evt.target._private.data.ref.deref(), evt.target._private.data)
         })
+    }
+
+    pop(node: cytoscape.CollectionReturnValue) {
+        node.animate({
+            style: {
+                'background-color': '#FF4136', // Bright red color for emphasis
+                width: '40px', // Larger size to make the node pop
+                height: '40px',
+            },
+            duration: 5,
+        })
+            .delay(50)
+            .animate(
+                {
+                    style: {
+                        'background-color': '', // Reset to default by removing the style
+                        width: '25px', // Reset to default by removing the style
+                        height: '25px', // Reset to default by removing the style
+                    },
+                    duration: 5,
+                },
+                {
+                    // Callback to completely remove the inline styles after animation
+                    complete: function () {
+                        node.removeStyle() // Removes all inline styles and reverts to stylesheet
+                    },
+                },
+            )
     }
 
     _updated() {

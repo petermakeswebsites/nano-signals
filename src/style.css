@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 ul {
     list-style: none;
 }
@@ -23,6 +19,14 @@ h2 {
     background-color: red;
 }
 
+input {
+    @apply bg-red-400
+}
+
+button {
+
+}
+
 button.hidden {
     display: none;
 }
@@ -34,5 +38,5 @@ button.hidden {
 }
 
 button {
-    
+
 }

@@ -10,28 +10,24 @@ export function check_if_dirty(source: Derived<any> | Source<any>): Flag.DIRTY |
     // as dirty, so you can never actually reach a "dirty" source without going through
     // a dirty thing itself and returning
     if (source instanceof Source) return Flag.CLEAN
-
     if (source.flag === Flag.CLEAN) return Flag.CLEAN
-    else if (source.flag === Flag.DIRTY) {
-        // Process change
-        const oldValue = source._value
-        const newValue = source.value // Also triggers update and marks as clean
 
-        if (oldValue === newValue) {
-            // We're clean and haven't changed
-            return Flag.CLEAN
-        } else {
-            // The value *has* changed, so we have to set all reactions to definitely dirty
-            source.rx.forEach((effectOrDerived) => {
-                mark_dirty_recursive(effectOrDerived, Call.INITIAL)
-            })
-            return Flag.DIRTY
-        }
-    } else if (source.flag === Flag.MAYBE_DIRTY) {
-        // We return clean if ALL are clean
-        return [...source.deps].some((dep) => check_if_dirty(dep) === Flag.DIRTY) ? Flag.DIRTY : Flag.CLEAN
+    const reeval = source.flag === Flag.DIRTY || [...source.deps].some((dep) => check_if_dirty(dep) === Flag.DIRTY)
+    if (reeval === false) return Flag.CLEAN
+
+    // Process change
+    const oldValue = source._value
+    const newValue = source.value // Also triggers update and marks as clean
+
+    if (oldValue === newValue) {
+        // We're clean and haven't changed
+        return Flag.CLEAN
     } else {
-        throw new Error(`A type of flag was not recognised, should never happen!`)
+        // The value *has* changed, so we have to set all reactions to definitely dirty
+        source.rx.forEach((effectOrDerived) => {
+            mark_dirty_recursive(effectOrDerived, Call.INITIAL)
+        })
+        return Flag.DIRTY
     }
 }
 
@@ -79,6 +75,7 @@ export function mark_dirty_recursive(reaction: Effect<any> | Derived<any>, call:
 
         reaction.flag = call === Call.INITIAL ? Flag.DIRTY : Flag.MAYBE_DIRTY
         if (Inspector.inspecting) Inspector._registerDirtinessChange(reaction.weakref, reaction.flag)
+
         reaction.rx.forEach((effectOrDerived) => {
             mark_dirty_recursive(effectOrDerived, Call.SECONDARY)
         })

@@ -64,7 +64,7 @@ export class Effect<T> {
     ) {
         // this.flag = Flag.DIRTY
         if (Inspector.inspecting) {
-            if (!name) console.trace('Effect created without name!', this)
+            if (Inspector.forceNames && !name) console.trace('Effect created without name!', this)
             Inspector._newItem(this.weakref, name)
             // Inspector._registerDirtinessChange(this.weakref, Flag.DIRTY)
         }

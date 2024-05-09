@@ -17,8 +17,8 @@ export const cytoLayout: cytoscape.LayoutOptions = {
     // },
     // minNodeSpacing: 70,
     // spacingFactor: 1.5,
-    // fit: true, // Turn off automatic fitting
+    fit: true, // Turn off automatic fitting
     // padding: 30,
-    // animate: true,
-    // animationDuration: 500,
+    animate: true,
+    animationDuration: 500,
 }
