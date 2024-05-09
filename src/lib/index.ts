@@ -1,8 +1,8 @@
-export { $effect, Effect, EffectRoot, $root, $set, $get } from './effect.ts'
+export { $effect, Effect, EffectRoot, $set, $get } from './effect.ts'
 export { Source, $source } from './source.ts'
 export { Derived, $derived } from './derived.ts'
 export { $component } from './component.ts'
-export { $if, $innertext, $class, $each, create, $child, $children, html } from './helpers.ts'
+export { $if, $innertext, $class, create, $child, $children, html } from './helpers.ts'
 export { untrack } from './collector.ts'
 export {
     Inspector,

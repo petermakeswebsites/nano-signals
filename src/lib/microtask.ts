@@ -3,7 +3,7 @@ import { Inspector } from './inspect.ts'
 import { Flag } from './dirtiness.ts'
 
 const queuedOrganisedEffects = new Set<Effect<any>>()
-const queuedEffects = new Set<Effect<any>>()
+const queuedDirtyEffects = new Set<Effect<any>>()
 const queuedMaybeEffects = new Set<Effect<any>>()
 
 let tickCallbacks: (() => any)[] = []
@@ -19,10 +19,15 @@ export enum Phase {
  * For testing a debug purposes
  */
 export function _kill_all_microtasks() {
-    queuedEffects.clear()
+    queuedDirtyEffects.clear()
     tickCallbacks = []
 }
 
+/**
+ * Tick allows us to wait until all the effects have completed. This ensures
+ * we have the latest values available. Synchronistically accessing values will work for sources and derives,
+ * but if there are effects that change things, those need to be processed as well.
+ */
 export function tick() {
     return new Promise<void>((res) => {
         if (no_queued_effects()) {
@@ -57,6 +62,20 @@ export function queue_microtask_effect(effect: Effect<any>, flag: Flag.DIRTY | F
     set_microtask_or_inspect()
 }
 
+/**
+ * This is a cyclic function that gradually moves through the microtask queue. First, it
+ * goes through the "maybe" effect list {@link queuedMaybeEffects}. It will keep doing this
+ * until all maybes are either dirty or clean.
+ *
+ * Then, it will organise the dirties. It will basically find redundancies, for example if
+ * re-run a branch and a leaf, you only need to do the branch. Moreover, it can lead to bugs
+ * if you don't do this. A branch might be called first, and if the leaf is still in the queue,
+ * the leaf might be referencing things that don't exist anymore.
+ *
+ * Finally, once it's organised, it will run all the dirty effects.
+ *
+ * TODO make sure the effects run in the order they were added to in the queue
+ */
 function flush_microtasks() {
     if (no_queued_effects()) {
         if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.DONE)
@@ -69,9 +88,15 @@ function flush_microtasks() {
     if (firstMaybe) {
         // Let's process this and see if it's dirty or clean
         const flag = firstMaybe.process_deps_dirtiness()
+
+        // Part of the algorithm is that it tags effects that need to be rendered,
+        // essentially making us run this whole thing again. To prevent it, we
+        // simply delete it here in case it was set.
+        queuedMaybeEffects.delete(firstMaybe)
+
         if (Inspector.inspecting) Inspector._registerDirtinessChange(firstMaybe.weakref, flag)
         if (flag === Flag.DIRTY) {
-            queuedEffects.add(firstMaybe)
+            queuedDirtyEffects.add(firstMaybe)
         }
 
         // This basically re-runs the function, to go to the next step or re-do this one
@@ -80,7 +105,7 @@ function flush_microtasks() {
     }
 
     // No maybes, lets organise
-    if (queuedEffects.size) {
+    if (queuedDirtyEffects.size) {
         organise_dirty_effects()
         if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.ORGANISING_EFFECT_TREE)
         return set_microtask_or_inspect()
@@ -100,23 +125,27 @@ function flush_microtasks() {
 }
 
 /**
- * Mixed organised & dirty effects and organised them. Empties dirties and spits out organised
+ * This does what was mentioned above in {@link flush_microtasks}. Basically, it strips children of parents
+ * that are already in the queue that would be redundant to run, or that could lead to bugs.
  * @param dirtySet
  */
 function organise_dirty_effects() {
+    // First, we mix our organised effects back into the dirty effect pile,
+    // since they may interact
     for (const effect of queuedOrganisedEffects) {
-        queuedEffects.add(effect)
+        queuedDirtyEffects.add(effect)
     }
     queuedOrganisedEffects.clear()
 
-    for (const effect of queuedEffects) {
+    for (const effect of queuedDirtyEffects) {
         let isNonRedundant = true
-        let current = effect.parent // Start checking from the parent
+        let current = effect.parent
 
+        // Iterate up the parent
         while (current instanceof Effect) {
-            if (queuedEffects.has(current)) {
+            if (queuedDirtyEffects.has(current)) {
                 isNonRedundant = false
-                break // Only break here, move the processRedundantEffect call outside the loop
+                break
             }
             current = current.parent
         }
@@ -129,7 +158,7 @@ function organise_dirty_effects() {
     }
 
     // Clear the original effects after reorganizing
-    queuedEffects.clear()
+    queuedDirtyEffects.clear()
 }
 
 function extract_first_element_of_set<T>(set: Set<T>): T | undefined {
@@ -140,11 +169,6 @@ function extract_first_element_of_set<T>(set: Set<T>): T | undefined {
 }
 
 function set_microtask_or_inspect() {
-    // If there are queued effects, it means that the next microtask is already set
-    // if (no_queued_effects()) {
-    //     if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.DONE)
-    //     return
-    // }
     if (Inspector.stepping) {
         Inspector._setNextStep(flush_microtasks)
     } else {
@@ -152,18 +176,29 @@ function set_microtask_or_inspect() {
     }
 }
 
+/**
+ * Helper function to see if there is anything left in any of the queues, which
+ * essentially is checking if there are not microtasks to do.
+ */
 function no_queued_effects() {
-    return 0 === queuedEffects.size + queuedMaybeEffects.size + queuedOrganisedEffects.size
+    return 0 === queuedDirtyEffects.size + queuedMaybeEffects.size + queuedOrganisedEffects.size
 }
 
+/**
+ * Adds the {@link effect} into the appropriate set. It also "moves" the effect if it is present
+ * in another set, ensuring that there are no weird bugs where an effect is simultaneously in a maybe
+ * and in an organised or something of that nature.
+ * @param effect
+ * @param flag
+ */
 function add_to_appropriate_set(effect: Effect<any>, flag: Flag.DIRTY | Flag.MAYBE_DIRTY) {
     if (Inspector.inspecting) Inspector._registerDirtinessChange(effect.weakref, flag)
     if (flag === Flag.MAYBE_DIRTY) {
         // If it's already in the dirty laundry, we don't want to set it to a maybe
-        if (!queuedEffects.has(effect)) queuedMaybeEffects.add(effect)
+        if (!queuedDirtyEffects.has(effect)) queuedMaybeEffects.add(effect)
     } else {
         // In case it's already in maybe, we will remove it - keep things unique
         queuedMaybeEffects.delete(effect)
-        queuedEffects.add(effect)
+        queuedDirtyEffects.add(effect)
     }
 }

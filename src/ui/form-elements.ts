@@ -18,7 +18,7 @@ export const textInput = $component<{ placeholder: string; name: string }>((node
 
 export const form = $component<{
     onsubmit: (this: HTMLFormElement, e: SubmitEvent) => void
-    children: Children
+    children: Children<any>
 }>((node, { onsubmit, children }) => {
     const [form] = html(`<form></form>`) as [HTMLFormElement]
     form.addEventListener('submit', onsubmit)

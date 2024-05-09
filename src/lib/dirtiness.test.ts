@@ -1,11 +1,5 @@
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest'
-import {
-    $effect,
-    $get,
-    $root,
-    $set,
-    _reset_all_global_trackers,
-} from './effect.ts'
+import { $effect, $get, $set, _reset_all_global_trackers } from './effect.ts'
 import { DepCollector } from './collector.ts'
 import { _kill_all_microtasks, tick } from './microtask.ts'
 import { $source, Source } from './source.ts'
@@ -23,7 +17,7 @@ describe('dirtiness tests', () => {
         const source = $source(5)
         const derived = $derived(() => $get(source) > 10)
         const spy = vi.fn()
-        $root(() => {
+        $effect.root(() => {
             $effect.pre(() => {
                 spy($get(derived))
             })
@@ -47,7 +41,7 @@ describe('dirtiness tests', () => {
 
         const end = $derived(() => $get(derived) > $get(derived2), 'end') // 3 > 6 == false
         const spy = vi.fn()
-        $root(() => {
+        $effect.root(() => {
             $effect.pre(() => {
                 console.log('answer', $get(end))
                 spy($get(end))
@@ -93,7 +87,7 @@ describe('dirtiness tests', () => {
                 $get(source) + $get(source2)
             })
 
-            root = $root(() => {
+            root = $effect.root(() => {
                 fx = $effect(() => {
                     $get(source)
                     return spyDerived1

@@ -1,10 +1,4 @@
-import {
-    $effect,
-    _reset_all_global_trackers,
-    $get,
-    $set,
-    $root,
-} from './effect.ts'
+import { $effect, _reset_all_global_trackers, $get, $set } from './effect.ts'
 import { describe, beforeEach, vi, it, expect, Mock } from 'vitest'
 import { $source, Source } from './source.ts'
 import { DepCollector } from './collector.ts'
@@ -20,7 +14,7 @@ describe('reactivity tests', () => {
 
     it('pre-effect should fire in a root context', () => {
         const spy = vi.fn()
-        $root(() => {
+        $effect.root(() => {
             $effect.pre(() => {
                 spy()
             })
@@ -34,7 +28,7 @@ describe('reactivity tests', () => {
         // @ts-ignore
         let root: EffectRoot
         beforeEach(() => {
-            root = $root(() => {
+            root = $effect.root(() => {
                 fx = $effect(() => {})
             })
         })
@@ -62,7 +56,7 @@ describe('reactivity tests', () => {
         beforeEach(() => {
             spy = vi.fn()
             source = $source(0)
-            root = $root(() => {
+            root = $effect.root(() => {
                 fx = $effect(() => {
                     $get(source)
                     return spy
@@ -115,9 +109,9 @@ describe('reactivity tests', () => {
         let fx2: Effect<any>
 
         beforeEach(() => {
-            root = $root(() => {
+            root = $effect.root(() => {
                 fx = $effect(() => {
-                    nestedRoot = $root(() => {
+                    nestedRoot = $effect.root(() => {
                         fx2 = $effect(() => {})
                     })
                 })
@@ -145,7 +139,7 @@ describe('reactivity tests', () => {
         beforeEach(() => {
             spy = vi.fn()
             count = $source(0)
-            root = $root(() => {
+            root = $effect.root(() => {
                 fx = $effect.pre(() => {
                     spy($get(count))
                 })

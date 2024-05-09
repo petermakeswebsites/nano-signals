@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, Mock, vi } from 'vitest'
-import {
-    $effect,
-    $get,
-    $root,
-    $set,
-    _reset_all_global_trackers,
-    EffectRoot,
-} from './effect.ts'
+import { $effect, $get, $set, _reset_all_global_trackers, EffectRoot } from './effect.ts'
 import { DepCollector } from './collector.ts'
 import { $derived, $source, tick } from './'
 import { _kill_all_microtasks } from './microtask.ts'
@@ -71,7 +64,7 @@ describe('microtask test', () => {
             const a = $source(1)
             const b = $source(1)
 
-            $root(() => {
+            $effect.root(() => {
                 $effect(() => {
                     spy($get(a) + $get(b))
                 })
@@ -91,7 +84,7 @@ describe('microtask test', () => {
             const b = $source(1)
             const c = $derived(() => $get(a) + $get(b))
 
-            $root(() => {
+            $effect.root(() => {
                 $effect(() => {
                     spy(`${$get(a)} ${$get(b)} ${$get(c)}`)
                 })

@@ -95,19 +95,17 @@ export class Effect<T> {
      */
     process_deps_dirtiness() {
         // Here's my logic. So basically, if this effect was added to queue (where this should be called from)
-        // it would definitely be dirty on not maybe dirty. shouldRun() is only called when this is maybe dirty.
-        // Therefor this function would not call. This means that its deps are a mix of either two
-        // options: clean sources, maybe derived, clean derived, or dirty deriveds.
-        //
-        // What this means is that all potential effects that could have created this combination would
-        // have already been marked as maybes, therefore we would not need to ever mark this, which is
-        // why check_if_dirty doesn't mark effects.
+        // it would definitely be dirty and not maybe dirty. Therefor it would be run without needing to check, so
+        // it would not call this function. This function is only called when this is maybe dirty.
+        // This means that its deps are a mix of either two options:
+        // clean sources, maybe derived, clean derived, or dirty deriveds.
         return [...this.deps].some((dep) => check_if_dirty(dep) === Flag.DIRTY) ? Flag.DIRTY : Flag.CLEAN
     }
 
     /**
      * Disconnect deps and signals, re-run the function,
-     * and refresh signals (because they might change!)
+     * and refresh signals (because they might change!).
+     * The effect is clean after this, but that's handled in the microtask file.
      */
     rerun() {
         if (this.destroyed) throw new Error(`Effect was destroyed, should not have been re-run!`)
@@ -122,13 +120,15 @@ export class Effect<T> {
         rootContext = this
         this.cleanup = collect_deps(() => this.fn(memory as T | undefined), this)
         rootContext = oldRootContext
-
-        // this.flag = Flag.CLEAN
-        // if (Inspector.inspecting) {
-        //     Inspector._registerDirtinessChange(this.weakref, Flag.CLEAN)
-        // }
     }
 
+    /**
+     * We need to remove children under two conditions:
+     * 1. During destruction
+     * 2. During cleanup (for a re-run)
+     *
+     * Children's cleanup/destroy functions are called first before we work our way back here.
+     */
     destroy_children() {
         // Cleanup children
         for (const child of [...this.children]) {
@@ -177,6 +177,8 @@ export class EffectRoot {
         fn: () => (() => void) | void,
         public readonly name?: string,
     ) {
+        // In case we are nesting roots, which you generally wouldn't do,
+        // we need to store the old root in memory before moving to the next
         const oldRoot = rootContext
         rootContext = this
         if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
@@ -207,26 +209,6 @@ export class EffectRoot {
     }
 }
 
-export function $root(fn: () => void | (() => void), name?: string) {
-    return new EffectRoot(fn, name)
-}
-
-// Define an interface that extends the function type
-interface EffectFunction {
-    <T>(fn: EffectFn<T>, name?: string): Effect<T>
-    pre: <T>(fn: EffectFn<T>, name?: string) => Effect<T>
-}
-
-// Implement the interface
-const effect: EffectFunction = <T>(fn: EffectFn<T>, name?: string) => {
-    return new Effect(fn, false, name)
-}
-
-// Define the pre method on effect
-effect.pre = <T>(fn: EffectFn<T>, name?: string): Effect<T> => {
-    return new Effect(fn, true, name)
-}
-
 /**
  * Initial function is fired after the microtask
  * See {@link Effect}
@@ -243,6 +225,15 @@ export function $effect<T>(fn: EffectFn<T>, name?: string) {
  */
 $effect.pre = function <T>(fn: EffectFn<T>, name?: string): Effect<T> {
     return new Effect(fn, true, name)
+}
+
+/**
+ * Shorthand for creating a root, see {@link EffectRoot}
+ * @param fn
+ * @param name
+ */
+$effect.root = function (fn: () => void | (() => void), name?: string) {
+    return new EffectRoot(fn, name)
 }
 
 /**

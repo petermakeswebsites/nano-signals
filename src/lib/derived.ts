@@ -2,7 +2,6 @@ import { Source } from './source'
 import { type Effect } from './effect.ts'
 import { collect_deps, disconnect_deps } from './collector.ts'
 import { Inspector } from './inspect.ts'
-
 import { Flag } from './dirtiness.ts'
 
 /**

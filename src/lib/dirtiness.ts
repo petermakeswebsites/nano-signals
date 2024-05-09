@@ -31,25 +31,35 @@ export function check_if_dirty(source: Derived<any> | Source<any>): Flag.DIRTY |
     }
 }
 
+/**
+ * Responsible for flagging whether something needs to be re-evaluated, whether
+ * it might need to be, or whether it's clean. Note that {@link $effect}s are technically
+ * "flagged" but they work in a different way. They are stored in ../dirtiness.ts in sets.
+ * It's important to track these in sets for easy iteration, and redundant to have flag variables
+ * as well. However, when logging in the {@link Inspector}, {@link $effect}s use this same Flag enum.
+ */
 export enum Flag {
     DIRTY,
     CLEAN,
     MAYBE_DIRTY,
 }
 
+/**
+ * This is important to determine whether to mark certain things as dirty or not. Think of a signal changing value.
+ * We know its immediate reactions will be dirty for sure, but whether extended relatives will be dirty we're not sure.
+ * So the first call of {@link mark_dirty_recursive} is generally a {@link Call.INITIAL} one, then subsequent ones
+ * are secondary, marking with {@link Flag.MAYBE_DIRTY}
+ */
 export enum Call {
     INITIAL,
     SECONDARY,
 }
 
 /**
- * Recursively marks dirty, taking advantage of the fact that we know the
- * reactions of all deriveds. But! We don't know effects. So the most we can do
- * is mark the effect dirty.
+ * Responsible for, as the name suggests, recursively marking dirty. This applies to {@link $deriveds}
+ * and {@link $effect}s. We propagate upwards until we reach an effect. Immediate relatives from the initial
+ * recursive call are marked as dirty, while subsequent ancestors are marked as maybe dirty.
  *
- * For the first call, because it had to go through the $set's checker first, it
- * is byproduct of something that has for sure changed, and therefor it is guaranteed
- * to be dirty.
  * @param reaction
  * @param call
  */
