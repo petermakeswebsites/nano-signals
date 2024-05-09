@@ -131,7 +131,6 @@ export class Visualiser {
             .animate(
                 {
                     style: {
-                        'background-color': '', // Reset to default by removing the style
                         width: '25px', // Reset to default by removing the style
                         height: '25px', // Reset to default by removing the style
                     },
