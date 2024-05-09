@@ -1,6 +1,9 @@
 import { Effect } from './effect.ts'
-import { Inspector } from './inspect.ts'
 import { Flag } from './dirtiness.ts'
+
+/* DEBUG START */
+import { Inspector } from './inspect.ts'
+/* DEBUG END */
 
 const queuedOrganisedEffects = new Set<Effect<any>>()
 const queuedDirtyEffects = new Set<Effect<any>>()
@@ -58,7 +61,9 @@ function run_tick_promises() {
  */
 export function queue_microtask_effect(effect: Effect<any>, flag: Flag.DIRTY | Flag.MAYBE_DIRTY) {
     add_to_appropriate_set(effect, flag)
+    /* DEBUG START */
     if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.AWAITING_FLUSH)
+    /* DEBUG END */
     set_microtask_or_inspect()
 }
 
@@ -78,7 +83,9 @@ export function queue_microtask_effect(effect: Effect<any>, flag: Flag.DIRTY | F
  */
 function flush_microtasks() {
     if (no_queued_effects()) {
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.DONE)
+        /* DEBUG END */
         run_tick_promises()
         return
     }
@@ -94,20 +101,26 @@ function flush_microtasks() {
         // simply delete it here in case it was set.
         queuedMaybeEffects.delete(firstMaybe)
 
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._registerDirtinessChange(firstMaybe.weakref, flag)
+        /* DEBUG END */
         if (flag === Flag.DIRTY) {
             queuedDirtyEffects.add(firstMaybe)
         }
 
-        // This basically re-runs the function, to go to the next step or re-do this one
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.PROCESSING_MAYBES)
+        /* DEBUG END */
+        // This basically re-runs the function, to go to the next step or re-do this one
         return set_microtask_or_inspect()
     }
 
     // No maybes, lets organise
     if (queuedDirtyEffects.size) {
         organise_dirty_effects()
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._microtaskPhaseChange(Phase.ORGANISING_EFFECT_TREE)
+        /* DEBUG END */
         return set_microtask_or_inspect()
     }
 
@@ -115,10 +128,12 @@ function flush_microtasks() {
     const firstOrganised = extract_first_element_of_set(queuedOrganisedEffects)
     if (firstOrganised) {
         // Definitely dirty, so lets just run it and clean it
+        /* DEBUG START */
         if (Inspector.inspecting) {
             Inspector._registerDirtinessChange(firstOrganised.weakref, Flag.CLEAN)
             Inspector._microtaskPhaseChange(Phase.APPLYING_EFFECTS)
         }
+        /* DEBUG END */
         firstOrganised.rerun()
     }
     return set_microtask_or_inspect()
@@ -127,7 +142,6 @@ function flush_microtasks() {
 /**
  * This does what was mentioned above in {@link flush_microtasks}. Basically, it strips children of parents
  * that are already in the queue that would be redundant to run, or that could lead to bugs.
- * @param dirtySet
  */
 function organise_dirty_effects() {
     // First, we mix our organised effects back into the dirty effect pile,
@@ -152,9 +166,13 @@ function organise_dirty_effects() {
 
         if (isNonRedundant) {
             queuedOrganisedEffects.add(effect)
-        } else {
+        }
+
+        /* DEBUG START */
+        if (!isNonRedundant) {
             if (Inspector.inspecting) Inspector._registerDirtinessChange(effect.weakref, Flag.CLEAN) // Now only called once per effect after confirming it's redundant
         }
+        /* DEBUG END */
     }
 
     // Clear the original effects after reorganizing
@@ -169,11 +187,14 @@ function extract_first_element_of_set<T>(set: Set<T>): T | undefined {
 }
 
 function set_microtask_or_inspect() {
+    /* DEBUG START */
     if (Inspector.stepping) {
         Inspector._setNextStep(flush_microtasks)
-    } else {
-        queueMicrotask(flush_microtasks)
+        return
     }
+    /* DEBUG END */
+
+    queueMicrotask(flush_microtasks)
 }
 
 /**
@@ -192,7 +213,10 @@ function no_queued_effects() {
  * @param flag
  */
 function add_to_appropriate_set(effect: Effect<any>, flag: Flag.DIRTY | Flag.MAYBE_DIRTY) {
+    /* DEBUG START */
     if (Inspector.inspecting) Inspector._registerDirtinessChange(effect.weakref, flag)
+    /* DEBUG END */
+
     if (flag === Flag.MAYBE_DIRTY) {
         // If it's already in the dirty laundry, we don't want to set it to a maybe
         if (!queuedDirtyEffects.has(effect)) queuedMaybeEffects.add(effect)

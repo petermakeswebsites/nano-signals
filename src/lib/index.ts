@@ -4,6 +4,10 @@ export { Derived, $derived } from './derived.ts'
 export { $component } from './component.ts'
 export { $if, $innertext, $class, create, $child, $children, html } from './helpers.ts'
 export { untrack } from './collector.ts'
+export { tick } from './microtask.ts'
+
+/* DEBUG START */
+export { Flag } from './dirtiness.ts'
 export {
     Inspector,
     type Allowed,
@@ -12,5 +16,4 @@ export {
     type RefdItem,
     type DataPack,
 } from './inspect.ts'
-export { tick } from './microtask.ts'
-export { Flag } from './dirtiness.ts'
+/* DEBUG END */

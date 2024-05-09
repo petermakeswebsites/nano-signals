@@ -1,6 +1,10 @@
 import { $set, Effect } from './effect.ts'
 import { Derived } from './derived.ts'
+
+/* DEBUG START */
 import { Inspector } from './inspect.ts'
+
+/* DEBUG END */
 
 /**
  * The simplest signal, it remembers who (which effect) retrieved it through {@link $get}, via
@@ -9,16 +13,27 @@ import { Inspector } from './inspect.ts'
  */
 export class Source<T> {
     value: T
+
+    /* DEBUG START */
     /**
      * Used for the {@link Inspector} tracking when its garbage collected
      */
     weakref = new WeakRef<Source<T>>(this)
 
-    constructor(def: T, name?: string) {
+    /* DEBUG END */
+
+    constructor(
+        def: T,
+        /* DEBUG START */
+        name?: string,
+        /* DEBUG END */
+    ) {
+        /* DEBUG START */
         if (Inspector.inspecting) {
             Inspector._newItem(this.weakref, name)
             Inspector._updateValue(this.weakref, def)
         }
+        /* DEBUG END */
         this.value = def
     }
 

@@ -1,7 +1,9 @@
 import { Effect } from './effect.ts'
 import { Derived } from './derived.ts'
 import { Source } from './source.ts'
+/* DEBUG START */
 import { Inspector } from './inspect.ts'
+/* DEBUG END */
 
 /**
  * This is our dependency collector. It essentially tracks the context
@@ -42,7 +44,9 @@ export class DepCollector<T> {
      */
     add(dep: Source<any> | Derived<any>) {
         if (!DepCollector.untrack) {
+            /* DEBUG START */
             if (Inspector.inspecting) Inspector._createRx(dep.weakref, this.recordingReaction.weakref)
+            /* DEBUG END */
             this.recordingReaction.deps.add(dep)
             dep.rx.add(this.recordingReaction)
         }
@@ -85,9 +89,11 @@ export function untrack<T>(fn: () => T) {
  */
 export function disconnect_deps(receiver: Effect<any> | Derived<any>) {
     for (const d of [...receiver.deps]) {
+        /* DEBUG START */
         if (Inspector.inspecting) {
             Inspector._removeRx(d.weakref, receiver.weakref)
         }
+        /* DEBUG END */
         receiver.deps.delete(d)
         d.rx.delete(receiver)
     }

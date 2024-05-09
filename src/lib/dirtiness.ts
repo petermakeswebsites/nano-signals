@@ -1,8 +1,10 @@
 import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { Effect } from './effect.ts'
-import { Inspector } from './inspect.ts'
 import { queue_microtask_effect } from './microtask.ts'
+/* DEBUG START */
+import { Inspector } from './inspect.ts'
+/* DEBUG END */
 
 export function check_if_dirty(source: Derived<any> | Source<any>): Flag.DIRTY | Flag.CLEAN {
     // Because of the way it was set up, source will always be clean. This is because
@@ -84,7 +86,9 @@ export function mark_dirty_recursive(reaction: Effect<any> | Derived<any>, call:
         // either way, we're making a change, so we need to process the reactions
 
         reaction.flag = call === Call.INITIAL ? Flag.DIRTY : Flag.MAYBE_DIRTY
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._registerDirtinessChange(reaction.weakref, reaction.flag)
+        /* DEBUG END */
 
         reaction.rx.forEach((effectOrDerived) => {
             mark_dirty_recursive(effectOrDerived, Call.SECONDARY)

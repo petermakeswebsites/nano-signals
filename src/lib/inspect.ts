@@ -1,3 +1,4 @@
+/* DEBUG START */
 import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { Effect, EffectRoot } from './effect.ts'
@@ -254,3 +255,4 @@ export const Inspector = new (class {
         this.onDestroyNode?.(pack)
     }
 })()
+/* DEBUG END */

@@ -13,7 +13,8 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && pnpm run build:minify",
+    "build:minify": "esbuild ./dist/index.js --bundle --minify --outfile=./dist/index.min.js --format=esm",
     "preview": "vite preview",
     "test": "vitest"
   },
@@ -21,7 +22,9 @@
     "@types/cytoscape": "^3.21.0",
     "cytoscape": "^3.29.2",
     "cytoscape-cose-bilkent": "^4.1.0",
+    "esbuild": "^0.21.1",
     "prettier": "^3.2.5",
+    "terser": "^5.31.0",
     "typescript": "^5.2.2",
     "vite": "^5.2.10",
     "vite-plugin-dts": "^3.9.1",

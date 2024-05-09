@@ -1,9 +1,11 @@
 import { Source } from './source.ts'
 import { Derived } from './derived.ts'
 import { collect_deps, DepCollector, disconnect_deps } from './collector.ts'
-import { Inspector } from './inspect.ts'
 import { queue_microtask_effect } from './microtask.ts'
 import { Call, check_if_dirty, Flag, mark_dirty_recursive } from './dirtiness.ts'
+/* DEBUG START */
+import { Inspector } from './inspect.ts'
+/* DEBUG END */
 
 export function _reset_all_global_trackers() {
     rootContext = null
@@ -55,22 +57,32 @@ export class Effect<T> {
      * Tracking the signals that will signal this effect
      */
     deps = new Set<Source<any> | Derived<any>>()
+
+    /* DEBUG START */
     weakref = new WeakRef(this)
+    /* DEBUG END */
 
     constructor(
         public readonly fn: EffectFn<T>,
         pre: boolean = false,
+        /* DEBUG START */
         name?: string,
+        /* DEBUG END */
     ) {
         // this.flag = Flag.DIRTY
+        /* DEBUG START */
         if (Inspector.inspecting) {
             if (Inspector.forceNames && !name) console.trace('Effect created without name!', this)
             Inspector._newItem(this.weakref, name)
             // Inspector._registerDirtinessChange(this.weakref, Flag.DIRTY)
         }
+        /* DEBUG END */
         if (!rootContext) throw new Error(`Cannot create effect without root`)
 
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._createEffectRelation(rootContext.weakref, this.weakref)
+        /* DEBUG END */
+
         rootContext.addEffect(this)
         this.parent = rootContext
 
@@ -134,7 +146,11 @@ export class Effect<T> {
         for (const child of [...this.children]) {
             this.children.delete(child)
             child.parent = null
+
+            /* DEBUG START */
             if (Inspector.inspecting) Inspector._destroyEffectRelation(this.weakref, child.weakref)
+            /* DEBUG END */
+
             child.destroy()
         }
     }
@@ -153,7 +169,10 @@ export class Effect<T> {
         if (this.cleanup) this.cleanup(true)
 
         this.cleanup = undefined
+
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._destroyItem(this.weakref)
+        /* DEBUG END */
     }
 }
 
@@ -167,7 +186,10 @@ export class Effect<T> {
 export class EffectRoot {
     destroyed = false
     rootDestroy: void | (() => void)
+
+    /* DEBUG START */
     weakref = new WeakRef<EffectRoot>(this)
+    /* DEBUG END */
 
     /**
      * Create an effect context
@@ -175,14 +197,21 @@ export class EffectRoot {
      */
     constructor(
         fn: () => (() => void) | void,
-        public readonly name?: string,
+        /* DEBUG START */
+        name?: string,
+        /* DEBUG END */
     ) {
         // In case we are nesting roots, which you generally wouldn't do,
         // we need to store the old root in memory before moving to the next
         const oldRoot = rootContext
         rootContext = this
+
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
+        /* DEBUG END */
+
         this.rootDestroy = fn()
+
         rootContext = oldRoot
     }
 
@@ -203,7 +232,11 @@ export class EffectRoot {
             effect.destroy()
             this.effects.delete(effect)
         }
+
+        /* DEBUG START */
         if (Inspector.inspecting) Inspector._destroyItem(this.weakref)
+        /* DEBUG END */
+
         this.rootDestroy?.()
         this.destroyed = true
     }
@@ -261,7 +294,9 @@ export function $set<T>(source: Source<T>, newValue: T): void {
     source.value = newValue
 
     // If inspecting, lets trigger that we updated the value
+    /* DEBUG START */
     if (Inspector.inspecting) Inspector._updateValue(source.weakref, newValue)
+    /* DEBUG END */
 
     // The spread operator is necessary here because sets get weird
     // if modified while in use
