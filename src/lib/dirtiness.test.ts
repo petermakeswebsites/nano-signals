@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, Mock, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { $effect, $get, $set, _reset_all_global_trackers } from './effect.ts'
 import { DepCollector } from './collector.ts'
 import { _kill_all_microtasks, tick } from './microtask.ts'
-import { $source, Source } from './source.ts'
-import { $derived, Derived } from './derived.ts'
+import { $source } from './source.ts'
+import { $derived } from './derived.ts'
 
 describe('dirtiness tests', () => {
     beforeEach(() => {
@@ -59,40 +59,40 @@ describe('dirtiness tests', () => {
         expect(spy).not.toHaveBeenCalledTimes(2)
     })
 
-    describe('dirtiness', () => {
-        // @ts-ignore
-        let source: Source<any>
-
-        // @ts-ignore
-        let source2: Source<any>
-        // @ts-ignore
-        let derived: Derived<any>
-
-        // @ts-ignore
-        let fx: Effect<any>
-
-        // @ts-ignore
-        let root: EffectRoot
-        // @ts-ignore
-        let spyDerived1: Mock<any, any>
-        // @ts-ignore
-        let spyEffect: Mock<any, any>
-
-        beforeEach(() => {
-            spyDerived1 = vi.fn()
-            source = $source(0)
-            source2 = $source(0)
-            derived = $derived(() => {
-                spyDerived1()
-                $get(source) + $get(source2)
-            })
-
-            root = $effect.root(() => {
-                fx = $effect(() => {
-                    $get(source)
-                    return spyDerived1
-                })
-            })
-        })
-    })
+    // describe('dirtiness', () => {
+    //     // @ts-ignore
+    //     let source: Source<any>
+    //
+    //     // @ts-ignore
+    //     let source2: Source<any>
+    //     // @ts-ignore
+    //     let derived: Derived<any>
+    //
+    //     // @ts-ignore
+    //     let fx: Effect<any>
+    //
+    //     // @ts-ignore
+    //     let root: EffectRoot
+    //     // @ts-ignore
+    //     let spyDerived1: Mock<any, any>
+    //     // @ts-ignore
+    //     let spyEffect: Mock<any, any>
+    //
+    //     beforeEach(() => {
+    //         spyDerived1 = vi.fn()
+    //         source = $source(0)
+    //         source2 = $source(0)
+    //         derived = $derived(() => {
+    //             spyDerived1()
+    //             $get(source) + $get(source2)
+    //         })
+    //
+    //         root = $effect.root(() => {
+    //             fx = $effect(() => {
+    //                 $get(source)
+    //                 return spyDerived1
+    //             })
+    //         })
+    //     })
+    // })
 })

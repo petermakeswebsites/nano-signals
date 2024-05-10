@@ -20,10 +20,10 @@ export default defineConfig({
   },
   plugins: [
     customCodeStripper(),
-    dts({
-      include: "./src/lib/",
-      exclude: ["./dist", "src/**/*.test.ts"],
-    }),
+    // dts({
+    //   include: "./src/lib/",
+    //   exclude: ["./dist", "src/**/*.test.ts"],
+    // }),
   ],
 });
 

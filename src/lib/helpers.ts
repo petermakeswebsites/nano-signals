@@ -71,7 +71,9 @@ export function $if<T extends RenderableElement>(
     fn: () => boolean,
     render: Children<T>,
     or?: Children<T> | undefined,
+    /* DEBUG START */
     name?: string,
+    /* DEBUG END */
 ) {
     $effect.pre(
         () => {
@@ -81,7 +83,9 @@ export function $if<T extends RenderableElement>(
                 if (or) return or(node)
             }
         },
+        /* DEBUG START */
         'then ' + (name || ''),
+        /* DEBUG END */
     )
 }
 

@@ -56,6 +56,16 @@ export class Source<T> {
  * @param def
  * @param name
  */
-export function $source<T>(def: T, name?: string) {
-    return new Source(def, name)
+export function $source<T>(
+    def: T,
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+) {
+    return new Source(
+        def,
+        /* DEBUG START */
+        name,
+        /* DEBUG END */
+    )
 }

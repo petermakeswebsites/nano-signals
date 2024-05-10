@@ -5,6 +5,7 @@ import { queue_microtask_effect } from './microtask.ts'
 import { Call, check_if_dirty, Flag, mark_dirty_recursive } from './dirtiness.ts'
 /* DEBUG START */
 import { Inspector } from './inspect.ts'
+
 /* DEBUG END */
 
 export function _reset_all_global_trackers() {
@@ -43,6 +44,7 @@ export class Effect<T> {
      */
     parent: EffectRoot | Effect<any> | null = null
     children = new Set<Effect<any>>()
+
     addEffect(effect: Effect<any>) {
         this.children.add(effect)
     }
@@ -60,6 +62,7 @@ export class Effect<T> {
 
     /* DEBUG START */
     weakref = new WeakRef(this)
+
     /* DEBUG END */
 
     constructor(
@@ -189,6 +192,7 @@ export class EffectRoot {
 
     /* DEBUG START */
     weakref = new WeakRef<EffectRoot>(this)
+
     /* DEBUG END */
 
     /**
@@ -245,28 +249,55 @@ export class EffectRoot {
 /**
  * Initial function is fired after the microtask
  * See {@link Effect}
- * @param fn
  */
-export function $effect<T>(fn: EffectFn<T>, name?: string) {
-    return new Effect(fn, false, name)
+export function $effect<T>(
+    fn: EffectFn<T>,
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+) {
+    return new Effect(
+        fn,
+        false,
+        /* DEBUG START */
+        name,
+        /* DEBUG END */
+    )
 }
 
 /**
  * Initial function is fired synchronously
- * @param fn
- * @param name
  */
-$effect.pre = function <T>(fn: EffectFn<T>, name?: string): Effect<T> {
-    return new Effect(fn, true, name)
+$effect.pre = function <T>(
+    fn: EffectFn<T>,
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+): Effect<T> {
+    return new Effect(
+        fn,
+        true,
+        /* DEBUG START */
+        name,
+        /* DEBUG END */
+    )
 }
 
 /**
  * Shorthand for creating a root, see {@link EffectRoot}
- * @param fn
- * @param name
  */
-$effect.root = function (fn: () => void | (() => void), name?: string) {
-    return new EffectRoot(fn, name)
+$effect.root = function (
+    fn: () => void | (() => void),
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+) {
+    return new EffectRoot(
+        fn,
+        /* DEBUG START */
+        name,
+        /* DEBUG END */
+    )
 }
 
 /**

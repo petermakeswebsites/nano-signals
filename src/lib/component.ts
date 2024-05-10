@@ -24,13 +24,26 @@ export function $component<
     Props extends { children?: Children<Q>; [key: string]: any },
     Q extends RenderableElement = any,
     // TODO make it so that props is optional when Props is empty in a type-safe manner
->(render: (node: RenderableElement, props: Props) => (() => void) | void, name?: string) {
-    return (node: RenderableElement, props: Props, lastname?: '') => {
+>(
+    render: (node: RenderableElement, props: Props) => (() => void) | void,
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+) {
+    return (
+        node: RenderableElement,
+        props: Props,
+        /* DEBUG START */
+        lastname?: '',
+        /* DEBUG END */
+    ) => {
         $effect.pre(
             () => {
                 return render(node, props)
             },
+            /* DEBUG START */
             '' + (name || '') + (lastname || ''),
+            /* DEBUG END */
         )
     }
 }

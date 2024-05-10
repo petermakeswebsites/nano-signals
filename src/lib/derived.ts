@@ -25,7 +25,9 @@ export class Derived<T> {
     get value() {
         if (this.flag === Flag.DIRTY) {
             disconnect_deps(this)
+            /* DEBUG START */
             const oldValue = this._value
+            /* DEBUG END */
             this._value = collect_deps(this.fn, this)
             this.flag = Flag.CLEAN
             /* DEBUG START */
@@ -40,7 +42,9 @@ export class Derived<T> {
 
     constructor(
         public readonly fn: () => T,
+        /* DEBUG START */
         name?: string,
+        /* DEBUG END */
     ) {
         /* DEBUG START */
         if (Inspector.inspecting) Inspector._newItem(this.weakref, name)
@@ -61,6 +65,16 @@ export class Derived<T> {
     }
 }
 
-export function $derived<T>(fn: () => T, name?: string) {
-    return new Derived(fn, name)
+export function $derived<T>(
+    fn: () => T,
+    /* DEBUG START */
+    name?: string,
+    /* DEBUG END */
+) {
+    return new Derived(
+        fn,
+        /* DEBUG START */
+        name,
+        /* DEBUG END */
+    )
 }

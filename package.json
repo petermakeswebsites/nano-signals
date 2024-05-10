@@ -2,9 +2,10 @@
   "name": "nano-signals",
   "author": "Peter Batory-Bernardin",
   "license": "MIT",
-  "url": "git+https://github.com/petermakeswebsites/nano-signals.git",
+  "url": "https://github.com/petermakeswebsites/nano-signals",
+  "repository": "https://github.com/petermakeswebsites/nano-signals",
   "email": "peter@pmw.ltd",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,7 +14,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && pnpm run build:minify",
+    "build": "tsc && vite build && pnpm run build:minify && node ./generate-types.js",
     "build:minify": "esbuild ./dist/index.js --bundle --minify --outfile=./dist/index.min.js --format=esm",
     "preview": "vite preview",
     "test": "vitest"
