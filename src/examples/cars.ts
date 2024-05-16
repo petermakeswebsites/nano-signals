@@ -6,14 +6,13 @@ import {
     $derived,
     $effect,
     $get,
-    $innertext,
     $set,
     $source,
     Derived,
     Source,
-    $if,
+    html,
+    $bind,
 } from '../lib'
-import { button, form, textInput } from '../ui/form-elements.ts'
 
 export class Car {
     readonly name: string
@@ -38,35 +37,35 @@ export class Car {
 export const list = $source<Car[]>([new Car('toyota')], 'car list')
 
 export const CarListView = $component((node) => {
-    form(node, {
-        onsubmit: (e) => {
-            e.preventDefault()
-            // @ts-ignore
-            const formData = new FormData(e!.target!) // Create FormData object from the form
-            const name = formData.get('name')!
-            $set(list, [...$get(list), new Car('' + name)])
-        },
-        children: (node) => {
-            const h1 = create('h1')
-            $child(node, h1)
-            $effect.pre(() => {
-                $innertext(
-                    h1,
-                    'Cars:' +
-                        $get(list)
-                            .map((car) => car.name)
-                            .join(),
-                )
-            }, 'h1 text')
+    const { childNodes, $ } = html(`
+        <p>Cars: <span></span></p>
+        <div></div>
+        <form>
+            <input type="text" placeholder="toyota?" />
+            <button type="submit">+ Add Car</button>
+        </form>
+    `)
 
-            textInput(node, { placeholder: 'hello', name: 'name' })
-            button(node, {
-                text: 'create',
-                click: () => {},
-            })
-            return () => {}
-        },
+    const numCars = $('span')!
+    const newName = $source('', 'new car name')
+    $bind($('input')!, newName)
+    const div = $('div')!
+    $effect(() => {
+        div.innerHTML = $get(newName)
+    }, 'write html')
+
+    $('form')!.addEventListener('submit', (e) => {
+        e.preventDefault()
+        $set(list, [...$get(list), new Car('' + $get(newName))])
     })
+
+    $effect.pre(() => {
+        numCars!.innerText = $get(list)
+            .map((car) => car.name)
+            .join()
+    }, 'names')
+
+    $children(node, ...childNodes)
 
     $effect.pre(() => {
         CarList(node, {
@@ -79,18 +78,7 @@ export const CarListView = $component((node) => {
             },
         })
     }, 'car list')
-
-    // const ul = create('ul')
-    //
-    // $effect.pre(() => {
-    //     $get(list).forEach((car) => {
-    //         const li = create('li')
-    //         CarView(li, { car })
-    //         return $child(ul, li)
-    //     })
-    // }, 'car list')
-    // return $child(app, ul)
-})
+}, 'main car view')
 
 export const CarList = $component<{ cars: Car[]; del: (car: Car) => void }>((node: Element, { cars, del }) => {
     const ul = create('ul')
@@ -112,23 +100,34 @@ export const CarList = $component<{ cars: Car[]; del: (car: Car) => void }>((nod
 }, 'car list')
 
 export const CarView = $component<{ car: Car; del: () => void }>((node, { car, del }) => {
-    const h3 = create('h3')
-    $innertext(h3, car.name)
-    const p = create('p')
+    const { childNodes, $, $all } = html(`
+        <h3>${car.name}</h3>
+        <p></p>
+        <div></div>
+        <button>Delete</button>
+        <button>Refuel</button>
+        <button>Drive 10km</button>
+    `)
+
+    const p = $('p')!
+    const [deleteBtn, addBtn, subBtn] = $all('button')
+
     $effect.pre(() => {
-        $innertext(p, 'Fuel level: ' + $get(car.fuel))
+        p.innerText = 'Fuel level: ' + $get(car.fuel)
     }, 'car fuel gage')
 
-    const div = create('div')
-    $if(
-        div,
-        () => $get(car.lowFuel),
-        (node) => $innertext(node, 'low fuel!'),
-        (node) => $innertext(node, 'enough fuel'),
-        'fuel test',
-    )
+    const fuelGauge = $('div')!
+    $effect.pre(() => {
+        if ($get(car.lowFuel)) {
+            fuelGauge.innerText = 'low fuel!'
+        } else {
+            fuelGauge.innerText = 'enough fuel!'
+        }
+    }, 'render is enough fuel')
 
-    button(node, { text: 'delete', click: del })
+    deleteBtn!.addEventListener('click', del)
+    subBtn!.addEventListener('click', () => car.drive(10))
+    addBtn!.addEventListener('click', () => car.refuel())
 
-    return $children(node, h3, p, div)
+    return $children(node, ...childNodes)
 }, 'car view')

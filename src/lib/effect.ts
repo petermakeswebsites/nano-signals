@@ -67,7 +67,7 @@ export class Effect<T> {
 
     constructor(
         public readonly fn: EffectFn<T>,
-        pre: boolean = false,
+        public readonly pre: boolean = false,
         /* DEBUG START */
         name?: string,
         /* DEBUG END */
@@ -129,11 +129,14 @@ export class Effect<T> {
         // Remove deps
         disconnect_deps(this)
 
+        // Disconnect & destroy all children
         this.destroy_children()
 
         const oldRootContext = rootContext
         rootContext = this
-        this.cleanup = collect_deps(() => this.fn(memory as T | undefined), this)
+        const rtn = collect_deps(() => this.fn(memory as T | undefined), this)
+
+        if (typeof rtn === 'function') this.cleanup = rtn
         rootContext = oldRootContext
     }
 

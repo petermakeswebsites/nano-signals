@@ -10,81 +10,61 @@
  * ```
  */
 
-import { $effect } from './effect.ts'
-import { Children, RenderableElement } from './component.ts'
+import { $effect, $get, $set } from './effect.ts'
+import { ParseSelector } from 'typed-query-selector/parser'
+import { Source } from './source.ts'
 
-/**
- * Sets the innertext of a node, and returns a function that sets it back to
- * nothing
- *
- * **Example:**
- * ```typescript
- * $effect(() => $innertext(node, $get(helloWorld)))
- * ```
- * @param node
- * @param text
- */
-export function $innertext(node: { innerText: string }, text: string) {
-    node.innerText = text
-    return () => (node.innerText = '')
-}
+class Html {
+    static parser = new DOMParser()
+    doc: Document
 
-/**
- * Sets the innertext of a node, and returns a function that sets it back to
- * nothing
- *
- * **Example:**
- * ```typescript
- * $effect(() => $innerhtml(node, `<p>${$get(helloWorld)}</p>`))
- * ```
- * @param node
- * @param text
- */
-export function $innerhtml(node: { innerHTML: string }, text: string) {
-    node.innerHTML = text
-    return () => (node.innerHTML = '')
-}
-
-/**
- * Creates a simple text node
- * @param str
- */
-export function text(str: string) {
-    return document.createTextNode(str)
+    constructor(html: string) {
+        this.doc = Html.parser.parseFromString(html, 'text/html')
+    }
 }
 
 /**
  * Parses the html string and returns the elements inside
+ *
  * @param html
  */
 export function html(html: string) {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    return [...doc.body.childNodes]
+    const body = new Html(html).doc.body
+
+    function $<T extends string>(str: T) {
+        return body.querySelector(str) as ParseSelector<typeof str> | null
+    }
+
+    function $all<T extends string>(str: T) {
+        return [...body.querySelectorAll(str)] as (ParseSelector<typeof str> | undefined)[]
+    }
+
+    // @ts-expect-error
+    body.$ = $
+    // @ts-expect-error
+    body.$all = $all
+    return body as HTMLElement & {
+        $: typeof $
+        $all: typeof $all
+    }
 }
 
-/**
- *
- */
-export function $if<T extends RenderableElement>(
-    node: T,
-    fn: () => boolean,
-    render: Children<T>,
-    or?: Children<T> | undefined,
-    /* DEBUG START */
-    name?: string,
-    /* DEBUG END */
+export function $bind<T extends EventTarget>(
+    element: T,
+    source: Source<any>,
+    ...[property, triggers]: T extends HTMLInputElement
+        ? [property?: keyof T, triggers?: (keyof T)[]]
+        : [property: keyof T, triggers: (keyof T)[]]
 ) {
-    $effect.pre(
-        () => {
-            if (fn()) {
-                return render(node)
-            } else {
-                if (or) return or(node)
-            }
-        },
+    const actualProperty = ('value' in element && property === undefined ? 'value' : property) as keyof T
+    for (const trigger of triggers || ['input']) {
+        element.addEventListener(trigger.toString(), () => $set(source, element[actualProperty]))
+    }
+
+    $effect(
+        () => (element[actualProperty] = $get(source)),
         /* DEBUG START */
-        'then ' + (name || ''),
+        'change element ' + (property === undefined ? '' : property),
         /* DEBUG END */
     )
 }
@@ -94,11 +74,9 @@ export function $if<T extends RenderableElement>(
  * @param parent
  * @param child
  */
-export function $child<T extends Element, Q extends Element | Text>(parent: T, child: Q) {
+export function $child<T extends Element, Q extends ChildNode>(parent: T, child: Q) {
     parent.appendChild(child)
-    return () => {
-        parent.removeChild(child)
-    }
+    return () => parent.removeChild(child)
 }
 
 export function $class<T extends Element>(element: T, className: string) {
@@ -106,18 +84,114 @@ export function $class<T extends Element>(element: T, className: string) {
     return () => element.classList.remove(className)
 }
 
-export function $children<T extends Element, Q extends (Element | Text)[]>(parent: T, ...children: Q) {
+$class.remove = function <T extends Element>(element: T, className: string) {
+    element.classList.remove(className)
+    return () => element.classList.add(className)
+}
+
+export function $before<T extends Element, Q extends Node[]>(olderBrother: T, ...siblings: Q) {
+    const parent = olderBrother.parentNode!
+    siblings.reduce((previousSibling, current) => {
+        parent.insertBefore(current, previousSibling)
+        return current
+    }, olderBrother)
+    return () => {
+        siblings.forEach((child) => child.parentNode?.removeChild(child))
+    }
+}
+
+export function $after<T extends Element, Q extends Node[]>(olderBrother: T, ...siblings: Q) {
+    const parent = olderBrother.parentNode!
+    siblings.reduce((previousSibling, current) => {
+        parent.insertBefore(current, previousSibling.nextSibling)
+        return current
+    }, olderBrother)
+    return () => {
+        siblings.forEach((child) => child.parentNode?.removeChild(child))
+    }
+}
+
+export function $children<T extends Element, Q extends ChildNode[]>(parent: T, ...children: Q) {
     children.forEach((child) => parent.appendChild(child))
     return () => {
         children.forEach((child) => parent.removeChild(child))
     }
 }
 
-export function create<T extends keyof HTMLElementTagNameMap>(tagName: T): HTMLElementTagNameMap[T]
-export function create<T extends keyof SVGElementTagNameMap>(tagName: T): SVGElementTagNameMap[T]
-export function create<T extends keyof (HTMLElementTagNameMap | SVGElementTagNameMap)>(
-    tagName: T,
-): HTMLElement | SVGElement {
-    const element = document.createElement(tagName)
-    return element
+export const create = ((tag: string) => document.createElement(tag)) as (typeof document)['createElement']
+
+export const $window: {
+    listen: <Q extends keyof WindowEventMap>(
+        type: Q,
+        listener: (this: Window, ev: WindowEventMap[Q]) => any,
+        options?: boolean | AddEventListenerOptions | undefined,
+    ) => () => void
+} = {
+    listen: function (type, listener, options) {
+        window.addEventListener(type, listener, options)
+        return () => window.removeEventListener(type, listener, options)
+    },
 }
+
+// type Render<T> = (val: T, index: number) => { nodes: ChildNode[]; update: Render<T> }
+// class EachItem<T, Q> {
+//     prev: EachItem<T, Q> | undefined
+//     next: EachItem<T, Q> | undefined
+//
+//     constructor(
+//         public readonly value: T,
+//         public readonly nodes: Node[],
+//         public readonly update: Render<T>,
+//     ) {}
+// }
+
+// class EachSnapshot<T, Q> {
+//     list = new Map<Q, EachItem<T, Q>>()
+//
+//     compare() {}
+// }
+//
+// export function $each<T, Q>(renderList: Source<T[]>, render: Render<T>, eachKey: (val: T, index: number) => Q) {
+//     const map = new Map<Q, { value: T; nodes: Node[]; update: Render<T> }>()
+//
+//     // We need to get the difference between a re-run and a destruction
+//     $effect.pre(
+//         () => {
+//             const list = $get(renderList).map((val, i) => [eachKey(val, i), { val, i }] as const)
+//
+//             const keySet = new Set(list.map(([q]) => q))
+//             if (keySet.size !== list.length) Error(`Illegal duplicate key for $each loop detected`)
+//
+//             const oldMap = new Map(map.entries())
+//             map.clear()
+//
+//             // Add in the new ones first
+//             for (const [key, { val, i }] of list) {
+//                 const oldInstance = oldMap.get(key)!
+//                 if (oldInstance) {
+//                     // Update!
+//                     if (oldInstance.value !== val) {
+//                         // Different key, re-run
+//                         oldInstance.update(val, i)
+//                     }
+//
+//                     // Move maybe?
+//                     // if ()
+//                 } else {
+//                     // Old instance doesn't exist - create!
+//                 }
+//             }
+//
+//             return (destroying) => {
+//                 if (destroying) {
+//                     map.forEach(({ nodes }) => {
+//                         nodes.forEach((node) => node.remove())
+//                     })
+//                 }
+//             }
+//         },
+//         /* DEBUG START */
+//         'each',
+//         /* DEBUG END */
+//     )
+// }

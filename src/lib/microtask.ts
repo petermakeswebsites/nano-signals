@@ -10,6 +10,7 @@ const queuedDirtyEffects = new Set<Effect<any>>()
 const queuedMaybeEffects = new Set<Effect<any>>()
 
 let tickCallbacks: (() => any)[] = []
+
 export enum Phase {
     DONE,
     AWAITING_FLUSH,
@@ -149,7 +150,8 @@ function organise_dirty_effects() {
     for (const effect of queuedOrganisedEffects) {
         queuedDirtyEffects.add(effect)
     }
-    queuedOrganisedEffects.clear()
+    const preEffects: Effect<any>[] = []
+    const postEffects: Effect<any>[] = []
 
     for (const effect of queuedDirtyEffects) {
         let isNonRedundant = true
@@ -165,7 +167,11 @@ function organise_dirty_effects() {
         }
 
         if (isNonRedundant) {
-            queuedOrganisedEffects.add(effect)
+            if (effect.pre) {
+                preEffects.push(effect)
+            } else {
+                postEffects.push(effect)
+            }
         }
 
         /* DEBUG START */
@@ -174,6 +180,11 @@ function organise_dirty_effects() {
         }
         /* DEBUG END */
     }
+
+    // Sort organised effects so that pres run first
+    queuedOrganisedEffects.clear()
+    for (const pre of preEffects) queuedOrganisedEffects.add(pre)
+    for (const post of postEffects) queuedOrganisedEffects.add(post)
 
     // Clear the original effects after reorganizing
     queuedDirtyEffects.clear()

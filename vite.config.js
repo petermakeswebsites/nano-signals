@@ -19,7 +19,7 @@ export default defineConfig({
     },
   },
   plugins: [
-    customCodeStripper(),
+    ...[process.env.NODE_ENV !== "development" ? customCodeStripper() : []],
     // dts({
     //   include: "./src/lib/",
     //   exclude: ["./dist", "src/**/*.test.ts"],

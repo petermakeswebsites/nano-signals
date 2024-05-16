@@ -7,6 +7,8 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
         style: {
             'background-color': '#666',
             label: 'data(name)',
+            width: '40px',
+            height: '40px',
             'text-valign': 'center',
             color: '#fff',
             shape: 'ellipse',
@@ -38,13 +40,13 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
     {
         selector: 'node[type="root"]',
         style: {
-            'background-color': '#faa',
+            'background-color': '#aaa',
         },
     },
     {
         selector: 'node[type="source"]',
         style: {
-            'background-color': '#faf',
+            'background-color': 'rgb(20, 15, 175)',
         },
     },
     {
@@ -75,15 +77,21 @@ export const cytoStyle: cytoscape.Stylesheet[] = [
     //     },
     // },
     {
-        selector: 'node[type="effect"]',
+        selector: 'node[type="effect"][order="pre"]',
         style: {
-            'background-color': '#aaf',
+            'background-color': 'rgb(15, 205, 70)',
+        },
+    },
+    {
+        selector: 'node[type="effect"][order="post"]',
+        style: {
+            'background-color': 'rgb(75, 125, 70)',
         },
     },
     {
         selector: 'node[type="derived"]',
         style: {
-            'background-color': '#afa',
+            'background-color': 'rgb(209, 88, 75)',
         },
     },
     {

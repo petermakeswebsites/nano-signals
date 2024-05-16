@@ -34,7 +34,7 @@ export function $component<
         node: RenderableElement,
         props: Props,
         /* DEBUG START */
-        lastname?: '',
+        lastname?: string,
         /* DEBUG END */
     ) => {
         $effect.pre(

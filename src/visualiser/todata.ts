@@ -20,6 +20,7 @@ export function toData<T extends Allowed>({ ref, name, id }: FullData<T>): cytos
             type: 'effect',
             state: '', // pending or not is managed elsewhere
             level: 1,
+            order: actualItem.pre ? 'pre' : 'post',
         }
     } else if (actualItem instanceof Source) {
         return {

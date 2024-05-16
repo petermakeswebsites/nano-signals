@@ -1,27 +1,12 @@
-
-
-.header {
-    display: flex;
-    margin-bottom: 1em;
-}
-
-h2 {
-    margin: 0
+body {
+    font-family: sans-serif;
 }
 
 .warning {
     background-color: red;
 }
 
-input {
-    @apply bg-red-400
-}
-
-button {
-
-}
-
-button.hidden {
+.hidden {
     display: none;
 }
 
@@ -29,8 +14,4 @@ button.hidden {
     position: fixed;
     right: 1em;
     top: 1em;
-}
-
-button {
-
 }

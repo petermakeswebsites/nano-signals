@@ -6,6 +6,7 @@ import { edgeID, toData, toEdge } from './todata.ts'
 
 import { DebounceTimer } from '../helpers/debounce.ts'
 import { cytoLayout } from './layout.ts'
+import { pop } from './animate.ts'
 
 export class Visualiser {
     cy = cytoscape({ style: cytoStyle })
@@ -88,7 +89,7 @@ export class Visualiser {
                 group: 'edges',
                 ...edge,
             })
-            this._updated()
+            // this._updated()
         }
 
         inspector.onDestroyReaction = (source, target) => {
@@ -99,7 +100,7 @@ export class Visualiser {
 
         inspector.onUpdateValue = ({ ref }, value) => {
             // Pop it!
-            this.pop(this.cy.getElementById(VisualiserList.getID(ref)))
+            pop(this.cy.getElementById(VisualiserList.getID(ref)))
 
             // Update actual value
             const valueNode = this.cy.getElementById(this.#valueId(VisualiserList.getID(ref)))
@@ -116,33 +117,6 @@ export class Visualiser {
             }
             console.log(evt.target._private.data.ref.deref(), evt.target._private.data)
         })
-    }
-
-    pop(node: cytoscape.CollectionReturnValue) {
-        node.animate({
-            style: {
-                'background-color': '#FF4136', // Bright red color for emphasis
-                width: '40px', // Larger size to make the node pop
-                height: '40px',
-            },
-            duration: 5,
-        })
-            .delay(50)
-            .animate(
-                {
-                    style: {
-                        width: '25px', // Reset to default by removing the style
-                        height: '25px', // Reset to default by removing the style
-                    },
-                    duration: 5,
-                },
-                {
-                    // Callback to completely remove the inline styles after animation
-                    complete: function () {
-                        node.removeStyle() // Removes all inline styles and reverts to stylesheet
-                    },
-                },
-            )
     }
 
     _updated() {
