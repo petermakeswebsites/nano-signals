@@ -15,10 +15,10 @@ export type Children<T extends RenderableElement> = (node: T) => ChildrenDestroy
  *
  * Because it's wrapped in an {@link $effect}, this means it will be destroyed automatically when the effect
  * is destroyed, meaning it doesn't need to manually dismounted. It just needs to be in an effect context.
+ * And if it's not in an effect context, it will throw an error.
  *
- * @param attachTo node to attach
- * @param render function that is called when the component is instantiated and returns a destroy function
- * @param name
+ * @param render function to be called inside the {@link $effect.pre} context.
+ * @param name name for debugging purposes
  */
 export function $component<
     Props extends { children?: Children<Q>; [key: string]: any },

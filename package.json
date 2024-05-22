@@ -5,7 +5,7 @@
   "url": "https://github.com/petermakeswebsites/nano-signals",
   "repository": "https://github.com/petermakeswebsites/nano-signals",
   "email": "peter@pmw.ltd",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "unpkg": "./dist/index.min.js",
   "type": "module",
   "module": "./dist/index.js",
@@ -19,6 +19,9 @@
     "build:minify": "esbuild ./dist/index.js --bundle --minify --outfile=./dist/index.min.js --format=esm",
     "preview": "vite preview",
     "test": "vitest"
+  },
+  "dependencies": {
+    "typed-query-selector": "^2.11.2"
   },
   "devDependencies": {
     "@types/cytoscape": "^3.21.0",

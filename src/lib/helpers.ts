@@ -24,8 +24,15 @@ class Html {
 }
 
 /**
- * Parses the html string and returns the elements inside
+ * Parses the html string and returns the body element that contains them. Appends two helper functions,
+ * `$` which acts as the shortcut for `querySelector` except returns an array rather than an iterator.
+ * And `$all` which acts as a shortcut for `querySelectorAll`.
  *
+ * ```typescript
+ * const {$} = html(`<div><span>hello</span><span>world</span></div>`)
+ * const div = $('div')
+ * const [span1, span2] = $all('span')
+ * ````
  * @param html
  */
 export function html(html: string) {
@@ -49,6 +56,16 @@ export function html(html: string) {
     }
 }
 
+/**
+ * Creates a two-way binding through event listeners and property modifications. By default, `$bind` is
+ * set up for inputs. It uses the `input` listener to listen for changes and changes the `input.value`
+ * property. This can be overridden through changing the {@link property} and {@link triggers} args.
+ *
+ * @param element
+ * @param source
+ * @param property
+ * @param triggers
+ */
 export function $bind<T extends EventTarget>(
     element: T,
     source: Source<any>,
@@ -70,7 +87,8 @@ export function $bind<T extends EventTarget>(
 }
 
 /**
- * Assigns a child to a parent
+ * Assigns a child to a parent. Returns a function that removes the child.
+ *
  * @param parent
  * @param child
  */
@@ -79,11 +97,36 @@ export function $child<T extends Element, Q extends ChildNode>(parent: T, child:
     return () => parent.removeChild(child)
 }
 
+/**
+ * Adds multiple children to the parent and returns a function that removes
+ * the children.
+ *
+ * @param parent
+ * @param children
+ */
+export function $children<T extends Element, Q extends ChildNode[]>(parent: T, ...children: Q) {
+    children.forEach((child) => parent.appendChild(child))
+    return () => {
+        children.forEach((child) => parent.removeChild(child))
+    }
+}
+
+/**
+ * Adds a class and returns a function that removes the class.
+ * @param element
+ * @param className
+ */
 export function $class<T extends Element>(element: T, className: string) {
     element.classList.add(className)
     return () => element.classList.remove(className)
 }
 
+/**
+ * Inverse of {@link $class}, removes a class and returns a function that
+ * adds the class back in.
+ * @param element
+ * @param className
+ */
 $class.remove = function <T extends Element>(element: T, className: string) {
     element.classList.remove(className)
     return () => element.classList.add(className)
@@ -111,16 +154,26 @@ export function $after<T extends Element, Q extends Node[]>(olderBrother: T, ...
     }
 }
 
-export function $children<T extends Element, Q extends ChildNode[]>(parent: T, ...children: Q) {
-    children.forEach((child) => parent.appendChild(child))
-    return () => {
-        children.forEach((child) => parent.removeChild(child))
-    }
-}
-
+/**
+ * Creates an element, shortcut for {@link document.createElement}
+ */
 export const create = ((tag: string) => document.createElement(tag)) as (typeof document)['createElement']
 
+/**
+ * Reactive shortcuts for the window
+ */
 export const $window: {
+    /**
+     * Adds an event listener to the window, returns a function
+     * that removes the event listener.
+     *
+     * ```typescript
+     * $effect(() => $window.listen("resize", () => console.log("resizing!")))
+     * ```
+     * @param type
+     * @param listener
+     * @param options
+     */
     listen: <Q extends keyof WindowEventMap>(
         type: Q,
         listener: (this: Window, ev: WindowEventMap[Q]) => any,
